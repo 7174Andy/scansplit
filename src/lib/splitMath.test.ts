@@ -30,3 +30,16 @@ describe("computeSplit — even N-way", () => {
     expect(result.perPerson[0].totalCents).toBe(0);
   });
 });
+
+describe("computeSplit — subset assignment", () => {
+  it("only assigned people pay; others owe zero for that item", () => {
+    const ps = people("A", "B", "C");
+    const result = computeSplit(
+      [{ ...item({ id: "i1", priceCents: 900 }), assignedPersonIds: ["p0", "p1"] }],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(450); // A
+    expect(result.perPerson[1].totalCents).toBe(450); // B
+    expect(result.perPerson[2].totalCents).toBe(0);   // C
+  });
+});
