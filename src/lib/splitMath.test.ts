@@ -43,3 +43,34 @@ describe("computeSplit — subset assignment", () => {
     expect(result.perPerson[2].totalCents).toBe(0);   // C
   });
 });
+
+describe("computeSplit — proportional tax & tip", () => {
+  it("allocates tax proportionally to each person's item subtotal", () => {
+    const ps = people("A", "B");
+    const result = computeSplit(
+      [
+        { ...item({ id: "i1", priceCents: 2000 }), assignedPersonIds: ["p0"] },
+        { ...item({ id: "i2", priceCents: 1000 }), assignedPersonIds: ["p1"] },
+        item({ id: "tax", priceCents: 300, kind: "tax" }),
+      ],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(2200);
+    expect(result.perPerson[1].totalCents).toBe(1100);
+    expect(result.totalCents).toBe(3300);
+  });
+
+  it("allocates tip the same way as tax", () => {
+    const ps = people("A", "B");
+    const result = computeSplit(
+      [
+        { ...item({ id: "i1", priceCents: 2000 }), assignedPersonIds: ["p0"] },
+        { ...item({ id: "i2", priceCents: 1000 }), assignedPersonIds: ["p1"] },
+        item({ id: "tip", priceCents: 600, kind: "tip" }),
+      ],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(2400);
+    expect(result.perPerson[1].totalCents).toBe(1200);
+  });
+});
