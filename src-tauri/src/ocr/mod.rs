@@ -54,26 +54,18 @@ mod tests {
     }
 
     #[test]
-    fn parsed_receipt_has_reconciled_default_true() {
-        let r = ParsedReceipt {
-            merchant: None,
-            items: vec![],
-            totals_reconciled: true,
-            parsed_total_cents: None,
-        };
+    fn parsed_receipt_reconciled_defaults_to_true_when_field_missing() {
+        let json = r#"{"merchant":null,"items":[]}"#;
+        let r: ParsedReceipt = serde_json::from_str(json).unwrap();
         assert!(r.totals_reconciled);
+        assert!(r.parsed_total_cents.is_none());
     }
 
     #[test]
-    fn parsed_item_default_confidence_is_high() {
-        let i = ParsedItem {
-            raw: "x".into(),
-            name: None,
-            price_cents: 0,
-            kind: "item".into(),
-            confidence: Confidence::High,
-            confidence_reasons: vec![],
-        };
+    fn parsed_item_confidence_defaults_to_high_when_field_missing() {
+        let json = r#"{"raw":"x","name":null,"priceCents":0,"kind":"item"}"#;
+        let i: ParsedItem = serde_json::from_str(json).unwrap();
         assert_eq!(i.confidence, Confidence::High);
+        assert!(i.confidence_reasons.is_empty());
     }
 }
