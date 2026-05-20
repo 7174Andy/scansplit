@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useWizardStore } from "../../store/wizardStore";
 import { ReceiptThumbnail } from "../../components/ReceiptThumbnail";
+import { ScanErrorDialog } from "../../components/ScanErrorDialog";
 import { api } from "../../lib/tauri";
 import { Plus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,24 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
   } = useWizardStore();
 
   const [picking, setPicking] = useState(false);
+  const [errorDialog, setErrorDialog] = useState<{ receiptId: string } | null>(null);
+
+  // Track which receipts we've already auto-opened a dialog for.
+  // When a receipt newly enters the error state (not previously errored), auto-open.
+  const prevErrorIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentErrors = new Set(
+      receipts.filter((r) => scanStatus[r.id] === "error").map((r) => r.id),
+    );
+    const newOnes: string[] = [];
+    currentErrors.forEach((id) => {
+      if (!prevErrorIds.current.has(id)) newOnes.push(id);
+    });
+    if (newOnes.length > 0) {
+      setErrorDialog({ receiptId: newOnes[newOnes.length - 1] });
+    }
+    prevErrorIds.current = currentErrors;
+  }, [scanStatus, receipts]);
 
   async function pickFiles() {
     setPicking(true);
@@ -86,6 +105,11 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
     };
   }
 
+  const activeErrorReceipt = errorDialog
+    ? receipts.find((r) => r.id === errorDialog.receiptId)
+    : undefined;
+  const activeErrorMsg = errorDialog ? scanErrors[errorDialog.receiptId] : undefined;
+
   return (
     <div>
       <p className="text-muted-foreground">
@@ -100,9 +124,8 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
             key={r.id}
             receipt={r}
             status={scanStatus[r.id] ?? "pending"}
-            error={scanErrors[r.id]}
             onRemove={() => removeReceipt(r.id)}
-            onRetry={() => scanOne(r.id, r.imagePath)}
+            onErrorClick={() => setErrorDialog({ receiptId: r.id })}
           />
         ))}
       </div>
@@ -111,6 +134,29 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
           Next <ArrowRight className="size-4" />
         </Button>
       </div>
+
+      {activeErrorReceipt && (
+        <ScanErrorDialog
+          open={true}
+          onOpenChange={(open) => { if (!open) setErrorDialog(null); }}
+          filename={activeErrorReceipt.imagePath.split("/").pop() ?? "(unknown)"}
+          error={activeErrorMsg ?? "Unknown error"}
+          onRetry={() => {
+            const id = activeErrorReceipt.id;
+            const path = activeErrorReceipt.imagePath;
+            setErrorDialog(null);
+            // Clear from prevErrorIds so the next failure re-opens the dialog
+            prevErrorIds.current.delete(id);
+            scanOne(id, path);
+          }}
+          onRemove={() => {
+            const id = activeErrorReceipt.id;
+            setErrorDialog(null);
+            prevErrorIds.current.delete(id);
+            removeReceipt(id);
+          }}
+        />
+      )}
     </div>
   );
 }
