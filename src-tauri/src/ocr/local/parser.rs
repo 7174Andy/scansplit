@@ -9,6 +9,11 @@ fn price_regex() -> &'static Regex {
     R.get_or_init(|| Regex::new(r"-?\$?\s*(\d+)[\.,](\d{2})").unwrap())
 }
 
+fn article_regex() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"^Article\s+\d+").unwrap())
+}
+
 fn extract_price_cents(text: &str) -> Option<i64> {
     let captures = price_regex().captures(text)?;
     let m = captures.get(0)?;
@@ -129,7 +134,7 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
 
     // Priceless-item detection: any line beginning with "Article" that has no
     // priced satellite within ±(2 * line_height) becomes a Low-confidence item.
-    let article_re = Regex::new(r"^Article\s+\d+").unwrap();
+    let article_re = article_regex();
     for (i, l) in lines.iter().enumerate() {
         if !article_re.is_match(l.text.trim()) { continue; }
 
@@ -161,10 +166,12 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
     }
 
     // Extract the printed total from any line containing the TOTAL keyword.
+    // Exclude SUBTOTAL and NET TOTAL — they are not the final printed total.
     let parsed_total_cents: Option<i64> = lines.iter()
         .filter(|l| {
             let t = l.text.to_uppercase();
-            t.contains("TOTAL") || t.contains("BALANCE") || t.contains("AMOUNT DUE")
+            !t.contains("SUBTOTAL") && !t.contains("NET TOTAL")
+                && (t.contains("TOTAL") || t.contains("BALANCE") || t.contains("AMOUNT DUE"))
         })
         .filter_map(|l| {
             // Find the priced satellite within window
@@ -416,5 +423,53 @@ mod tests {
         assert_eq!(priceless.len(), 1, "expected one priceless item");
         assert_eq!(priceless[0].confidence, Confidence::Low);
         assert!(priceless[0].name.as_deref().unwrap().contains("CITRONHAJ"));
+    }
+
+    #[test]
+    fn realistic_restaurant_receipt_reconciles_end_to_end() {
+        // 3 items + tax + tip + one discount — total is sum of all
+        let lines = vec![
+            line("The Diner",    0.40, 0.03, 0.60), // merchant header
+            line("Caesar Salad", 0.10, 0.30, 0.40),
+            line("12.50",        0.85, 0.30, 0.95),
+            line("Burger",       0.10, 0.35, 0.40),
+            line("14.00",        0.85, 0.35, 0.95),
+            line("Fries",        0.10, 0.40, 0.40),
+            line("4.50",         0.85, 0.40, 0.95),
+            line("PROMO -$2",    0.10, 0.45, 0.40),
+            line("-2.00",        0.85, 0.45, 0.95),
+            line("TAX",          0.10, 0.55, 0.20),
+            line("2.32",         0.85, 0.55, 0.95),
+            line("TIP",          0.10, 0.60, 0.20),
+            line("3.00",         0.85, 0.60, 0.95),
+            line("TOTAL",        0.10, 0.70, 0.30),
+            line("34.32",        0.85, 0.70, 0.95), // 1250+1400+450-200+232+300 = 3432
+        ];
+        let r = parse(lines);
+        assert_eq!(r.merchant.as_deref(), Some("The Diner"));
+        assert!(r.totals_reconciled);
+        assert_eq!(r.parsed_total_cents, Some(3432));
+        assert_eq!(r.items.iter().filter(|i| i.kind == "item").count(), 3);
+        assert!(r.items.iter().any(|i| i.kind == "tax" && i.price_cents == 232));
+        assert!(r.items.iter().any(|i| i.kind == "tip" && i.price_cents == 300));
+        assert!(r.items.iter().any(|i| i.kind == "discount" && i.price_cents == -200));
+        assert!(r.items.iter().all(|i| i.confidence == Confidence::High));
+    }
+
+    #[test]
+    fn subtotal_does_not_get_picked_as_printed_total() {
+        let lines = vec![
+            line("Burger",   0.10, 0.30, 0.40),
+            line("10.00",    0.85, 0.30, 0.95),
+            line("TAX",      0.10, 0.50, 0.20),
+            line("1.00",     0.85, 0.50, 0.95),
+            line("SUBTOTAL", 0.10, 0.60, 0.30),
+            line("10.00",    0.85, 0.60, 0.95),  // would corrupt reconciliation if matched
+            line("TOTAL",    0.10, 0.70, 0.30),
+            line("11.00",    0.85, 0.70, 0.95),
+        ];
+        let r = parse(lines);
+        assert_eq!(r.parsed_total_cents, Some(1100), "must be TOTAL (1100), not SUBTOTAL (1000)");
+        assert!(r.totals_reconciled);
     }
 }
