@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Copy as CopyIcon, Pencil, Trash2 } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { api } from "../lib/tauri";
-import { computeSplit } from "../lib/splitMath";
-import { SplitTotalsTable } from "../components/SplitTotalsTable";
-import { formatCents } from "../lib/formatCurrency";
-import { useWizardStore } from "../store/wizardStore";
-import type { FullTransaction } from "../lib/types";
+import { api } from "@/lib/tauri";
+import { computeSplit } from "@/lib/splitMath";
+import { SplitTotalsTable } from "@/components/SplitTotalsTable";
+import { formatCents } from "@/lib/formatCurrency";
+import { useWizardStore } from "@/store/wizardStore";
+import { Button } from "@/components/ui/button";
+import type { FullTransaction } from "@/lib/types";
 
 export default function TransactionView() {
   const { id = "" } = useParams<{ id: string }>();
@@ -30,8 +32,8 @@ export default function TransactionView() {
     );
   }, [full]);
 
-  if (err) return <div style={{ padding: 24, color: "#e07a7a" }}>Error: {err}</div>;
-  if (!full || !split) return <div style={{ padding: 24 }}>Loading…</div>;
+  if (err) return <div className="p-6 text-destructive">Error: {err}</div>;
+  if (!full || !split) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
   const personNames = Object.fromEntries(full.people.map((p) => [p.id, p.name]));
   const itemNames = Object.fromEntries(full.items.map((i) => [i.id, i.name]));
@@ -72,13 +74,21 @@ export default function TransactionView() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 700, margin: "0 auto" }}>
-      <Link to="/">← Home</Link>
-      <h1>{full.transaction.title}</h1>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button onClick={copy}>📋 Copy</button>
-        <button onClick={edit}>Edit</button>
-        <button onClick={del}>Delete</button>
+    <div className="mx-auto max-w-2xl p-6">
+      <Button variant="ghost" onClick={() => navigate("/")}>
+        <ArrowLeft className="size-4" /> Home
+      </Button>
+      <h1 className="mt-4 text-3xl font-bold">{full.transaction.title}</h1>
+      <div className="mb-4 flex gap-2">
+        <Button variant="outline" onClick={copy}>
+          <CopyIcon className="size-4" /> Copy
+        </Button>
+        <Button variant="outline" onClick={edit}>
+          <Pencil className="size-4" /> Edit
+        </Button>
+        <Button variant="destructive" onClick={del}>
+          <Trash2 className="size-4" /> Delete
+        </Button>
       </div>
       <SplitTotalsTable
         split={split}
