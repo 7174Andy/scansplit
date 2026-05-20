@@ -1,4 +1,7 @@
-import type { ReceiptRecord } from "../lib/types";
+import { Receipt, Check, RefreshCw, X } from "lucide-react";
+import type { ReceiptRecord } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface Props {
   receipt: ReceiptRecord;
@@ -10,24 +13,37 @@ interface Props {
 
 export function ReceiptThumbnail({ receipt, status, error, onRemove, onRetry }: Props) {
   return (
-    <div style={{
-      width: 90, padding: 8, background: "#222", borderRadius: 6,
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-      border: status === "error" ? "1px solid #e07a7a" : "1px solid #333",
-    }}>
-      <div style={{ fontSize: 28 }}>🧾</div>
-      <div style={{ fontSize: 10, color: "#888", textAlign: "center" }}>
+    <div
+      className={cn(
+        "relative flex w-28 flex-col items-center gap-1.5 rounded-lg border bg-card p-2.5",
+        status === "error" ? "border-destructive" : "border-border",
+      )}
+    >
+      <Receipt className="size-8" />
+      <div className="break-all text-center text-[11px] text-muted-foreground">
         {receipt.imagePath.split("/").pop()}
       </div>
-      {status === "scanning" && <div style={{ fontSize: 10 }}>scanning…</div>}
-      {status === "ok" && <div style={{ fontSize: 10, color: "#6ec96e" }}>✓ done</div>}
-      {status === "error" && (
-        <div style={{ fontSize: 10, color: "#e07a7a", textAlign: "center" }}>
-          {error}
-          {onRetry && <div><button style={{ fontSize: 10 }} onClick={onRetry}>Retry</button></div>}
+      {status === "scanning" && (
+        <div className="text-xs text-muted-foreground">scanning…</div>
+      )}
+      {status === "ok" && (
+        <div className="inline-flex items-center gap-1 text-xs text-success">
+          <Check className="size-3" /> done
         </div>
       )}
-      <button style={{ fontSize: 10 }} onClick={onRemove}>Remove</button>
+      {status === "error" && (
+        <div className="text-center text-[11px] text-destructive">
+          {error}
+          {onRetry && (
+            <Button variant="ghost" size="icon" aria-label="Retry scan" onClick={onRetry}>
+              <RefreshCw className="size-3.5" />
+            </Button>
+          )}
+        </div>
+      )}
+      <Button variant="ghost" size="icon" aria-label="Remove receipt" onClick={onRemove}>
+        <X className="size-3.5" />
+      </Button>
     </div>
   );
 }
