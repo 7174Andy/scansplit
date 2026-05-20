@@ -125,6 +125,8 @@ export const useWizardStore = create<WizardState>()(
           kind: p.kind,
           position: st.items.length + baseIndex + idx,
           assignedPersonIds: [],
+          confidence: p.confidence ?? "high",
+          confidenceReasons: p.confidenceReasons ?? [],
         }));
         return {
           items: [...st.items, ...newItems],

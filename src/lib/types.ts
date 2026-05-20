@@ -1,5 +1,7 @@
 export type ItemKind = "item" | "tax" | "tip" | "discount";
 
+export type Confidence = "high" | "medium" | "low";
+
 export interface Person {
   id: string;
   name: string;
@@ -59,6 +61,8 @@ export interface ItemRecord {
   kind: "item" | "tax" | "tip" | "discount";
   position: number;
   assignedPersonIds: string[];
+  confidence: Confidence;
+  confidenceReasons: string[];
 }
 
 export interface FullTransaction {
@@ -82,11 +86,15 @@ export interface ParsedItem {
   name: string | null;
   priceCents: number;
   kind: "item" | "tax" | "tip" | "discount";
+  confidence: Confidence;
+  confidenceReasons: string[];
 }
 
 export interface ParsedReceipt {
   merchant: string | null;
   items: ParsedItem[];
+  totalsReconciled: boolean;
+  parsedTotalCents?: number;
 }
 
 export interface ScanResult {

@@ -13,9 +13,10 @@ describe("wizardStore", () => {
     });
     useWizardStore.getState().mergeParsed(rid, {
       merchant: "Trattoria",
+      totalsReconciled: true,
       items: [
-        { raw: "PASTA", name: "Pasta", priceCents: 1400, kind: "item" },
-        { raw: "TAX", name: null, priceCents: 100, kind: "tax" },
+        { raw: "PASTA", name: "Pasta", priceCents: 1400, kind: "item", confidence: "high", confidenceReasons: [] },
+        { raw: "TAX", name: null, priceCents: 100, kind: "tax", confidence: "high", confidenceReasons: [] },
       ],
     });
     const items = useWizardStore.getState().items;
@@ -31,6 +32,7 @@ describe("wizardStore", () => {
     store.addItem({
       id: "i1", transactionId: "t", name: "Pasta", priceCents: 1400,
       kind: "item", position: 0, assignedPersonIds: [],
+      confidence: "high", confidenceReasons: [],
     });
     const aliceId = useWizardStore.getState().people[0].id;
     useWizardStore.getState().toggleAssignment("i1", aliceId);
@@ -47,6 +49,7 @@ describe("wizardStore", () => {
     s.addItem({
       id: "i1", transactionId: "t", name: "Pasta", priceCents: 1400,
       kind: "item", position: 0, assignedPersonIds: [alice.id],
+      confidence: "high", confidenceReasons: [],
     });
     useWizardStore.getState().toggleAssignment("i1", bob.id);
     expect(useWizardStore.getState().items[0].assignedPersonIds).toEqual([]);
@@ -60,6 +63,7 @@ describe("wizardStore", () => {
     s.addItem({
       id: "i1", transactionId: "t", name: "Pasta", priceCents: 1400,
       kind: "item", position: 0, assignedPersonIds: [],
+      confidence: "high", confidenceReasons: [],
     });
     useWizardStore.getState().toggleAssignment("i1", alice.id);
     expect(useWizardStore.getState().items[0].assignedPersonIds).toEqual([bob.id]);
@@ -74,6 +78,7 @@ describe("wizardStore", () => {
       id: "i1", transactionId: "t", name: "Wine", priceCents: 3000,
       kind: "item", position: 0,
       assignedPersonIds: [alice.id, bob.id],
+      confidence: "high", confidenceReasons: [],
     });
     useWizardStore.getState().removePerson(alice.id);
     expect(useWizardStore.getState().items[0].assignedPersonIds).toEqual([bob.id]);

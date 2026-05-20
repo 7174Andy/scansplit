@@ -43,6 +43,8 @@ export function Step2Items({ onBack, onNext }: { onBack: () => void; onNext: () 
             kind: "item",
             position: items.length,
             assignedPersonIds: [],
+            confidence: "high",
+            confidenceReasons: [],
           })
         }
       >

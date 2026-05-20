@@ -101,7 +101,7 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
         position: receipts.length, scannedAt: 0,
       });
       setScanStatus(receiptId, "ok");
-      mergeParsed(receiptId, { merchant: null, items: [] });
+      mergeParsed(receiptId, { merchant: null, items: [], totalsReconciled: true });
     };
   }
 
