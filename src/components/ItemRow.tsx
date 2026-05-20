@@ -1,5 +1,8 @@
-import type { ItemRecord } from "../lib/types";
-import { parseCurrencyToCents, formatCents } from "../lib/formatCurrency";
+import { Trash2 } from "lucide-react";
+import type { ItemRecord } from "@/lib/types";
+import { parseCurrencyToCents, formatCents } from "@/lib/formatCurrency";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface Props {
   item: ItemRecord;
@@ -9,40 +12,36 @@ interface Props {
 
 export function ItemRow({ item, onChange, onRemove }: Props) {
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "1fr 120px 120px 30px",
-      gap: 8, padding: "6px 0",
-      borderBottom: "1px solid #2a2a2a", alignItems: "center",
-    }}>
+    <div className="grid grid-cols-[1fr_120px_120px_40px] items-center gap-2 border-b border-border py-2">
       <div>
-        <input
+        <Input
           value={item.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          style={{ width: "100%", padding: 4 }}
         />
         {item.rawCode && item.rawCode !== item.name && (
-          <div style={{ fontSize: 11, color: "#666" }}>{item.rawCode}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{item.rawCode}</div>
         )}
       </div>
-      <input
+      <Input
         defaultValue={formatCents(item.priceCents).replace(/[^\d.-]/g, "")}
         onBlur={(e) => {
           const c = parseCurrencyToCents(e.target.value);
           if (c !== null) onChange({ priceCents: c });
         }}
-        style={{ width: "100%", padding: 4 }}
       />
       <select
         value={item.kind}
         onChange={(e) => onChange({ kind: e.target.value as ItemRecord["kind"] })}
+        className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
       >
         <option value="item">item</option>
         <option value="tax">tax</option>
         <option value="tip">tip</option>
         <option value="discount">discount</option>
       </select>
-      <button onClick={onRemove} title="Remove">✕</button>
+      <Button variant="ghost" size="icon" aria-label="Remove row" onClick={onRemove}>
+        <Trash2 className="size-3.5" />
+      </Button>
     </div>
   );
 }
