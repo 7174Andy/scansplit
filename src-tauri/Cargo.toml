@@ -29,6 +29,7 @@ chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
 tracing = "0.1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+regex = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
