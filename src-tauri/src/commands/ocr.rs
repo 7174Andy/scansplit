@@ -22,8 +22,8 @@ pub async fn scan_receipt(
     let stored = receipts_dir.join(format!("{}.{}", Uuid::new_v4(), ext));
     std::fs::copy(&source_path, &stored)?;
 
-    let key = crate::commands::settings::get_api_key().await?;
-    let key = key.ok_or(AppError::MissingApiKey)?;
+    let key = crate::commands::settings::read_api_key()?
+        .ok_or(AppError::MissingApiKey)?;
 
     let client = ClaudeClient::new();
     let mut parsed: ParsedReceipt = client.scan(&bytes, &key).await?;

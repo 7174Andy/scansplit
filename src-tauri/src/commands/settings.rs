@@ -8,14 +8,18 @@ fn entry() -> AppResult<Entry> {
     Ok(Entry::new(SERVICE, ACCOUNT)?)
 }
 
-#[tauri::command]
-pub async fn get_api_key() -> AppResult<Option<String>> {
+pub fn read_api_key() -> AppResult<Option<String>> {
     let e = entry()?;
     match e.get_password() {
         Ok(s) => Ok(Some(s)),
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(err) => Err(AppError::Keyring(err)),
     }
+}
+
+#[tauri::command]
+pub async fn get_api_key() -> AppResult<Option<String>> {
+    read_api_key()
 }
 
 #[tauri::command]
