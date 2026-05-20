@@ -160,11 +160,48 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
         });
     }
 
+    // Extract the printed total from any line containing the TOTAL keyword.
+    let parsed_total_cents: Option<i64> = lines.iter()
+        .filter(|l| {
+            let t = l.text.to_uppercase();
+            t.contains("TOTAL") || t.contains("BALANCE") || t.contains("AMOUNT DUE")
+        })
+        .filter_map(|l| {
+            // Find the priced satellite within window
+            lines.iter()
+                .filter(|ll| (ll.bbox.y_min - l.bbox.y_min).abs() <= window
+                    && extract_price_cents(&ll.text).is_some()
+                    && in_price_col(ll))
+                .filter_map(|ll| extract_price_cents(&ll.text))
+                .next()
+        })
+        .next();
+
+    let computed_total: i64 = items.iter().map(|i| i.price_cents).sum();
+    let mut totals_reconciled = true;
+    if let Some(printed) = parsed_total_cents {
+        let diff = (printed - computed_total).abs();
+        if diff > 1 {
+            totals_reconciled = false;
+        }
+    }
+
+    if !totals_reconciled {
+        for it in items.iter_mut() {
+            it.confidence = match it.confidence {
+                Confidence::High => Confidence::Medium,
+                Confidence::Medium => Confidence::Low,
+                Confidence::Low => Confidence::Low,
+            };
+            it.confidence_reasons.push("receipt totals don't reconcile".into());
+        }
+    }
+
     ParsedReceipt {
         merchant: None,
         items,
-        totals_reconciled: true,
-        parsed_total_cents: None,
+        totals_reconciled,
+        parsed_total_cents,
     }
 }
 
@@ -289,6 +326,51 @@ mod tests {
         assert_eq!(discounts[0].price_cents, -1000);
         // DRONA still there
         assert!(r.items.iter().any(|i| i.kind == "item" && i.price_cents == 499));
+    }
+
+    #[test]
+    fn matching_totals_keep_high_confidence_and_reconciled_true() {
+        let lines = vec![
+            line("Burger",   0.10, 0.30, 0.40),
+            line("10.00",    0.85, 0.30, 0.95),
+            line("TAX",      0.10, 0.50, 0.20),
+            line("1.00",     0.85, 0.50, 0.95),
+            line("TOTAL",    0.10, 0.70, 0.30),
+            line("11.00",    0.85, 0.70, 0.95),
+        ];
+        let r = parse(lines);
+        assert!(r.totals_reconciled);
+        assert_eq!(r.parsed_total_cents, Some(1100));
+        assert!(r.items.iter().all(|i| i.confidence == Confidence::High));
+    }
+
+    #[test]
+    fn mismatched_totals_set_flag_false_and_demote_items() {
+        let lines = vec![
+            line("Burger",   0.10, 0.30, 0.40),
+            line("10.00",    0.85, 0.30, 0.95),
+            line("TAX",      0.10, 0.50, 0.20),
+            line("1.00",     0.85, 0.50, 0.95),
+            line("TOTAL",    0.10, 0.70, 0.30),
+            line("99.99",    0.85, 0.70, 0.95), // wildly off
+        ];
+        let r = parse(lines);
+        assert!(!r.totals_reconciled);
+        assert_eq!(r.parsed_total_cents, Some(9999));
+        // Each item picks up 1 demerit -> Medium (was High with 0 demerits)
+        assert!(r.items.iter().all(|i| i.confidence == Confidence::Medium));
+    }
+
+    #[test]
+    fn one_cent_total_mismatch_is_ignored() {
+        let lines = vec![
+            line("Burger",   0.10, 0.30, 0.40),
+            line("10.00",    0.85, 0.30, 0.95),
+            line("TOTAL",    0.10, 0.70, 0.30),
+            line("10.01",    0.85, 0.70, 0.95),
+        ];
+        let r = parse(lines);
+        assert!(r.totals_reconciled, "1-cent mismatch should still reconcile");
     }
 
     #[test]
