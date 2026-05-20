@@ -57,6 +57,33 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
 
   const allDone = receipts.length > 0 && receipts.every((r) => scanStatus[r.id] === "ok");
 
+  if (import.meta.env.MODE === "test" && typeof window !== "undefined") {
+    (window as any).__scansplit_seed__ = (receiptId: string, parsed: any) => {
+      const id = receiptId;
+      addReceipt({
+        id, transactionId: transaction.id, imagePath: "/test/seed.jpg",
+        position: receipts.length, scannedAt: 0,
+      });
+      setScanStatus(id, "ok");
+      mergeParsed(id, parsed);
+    };
+    (window as any).__scansplit_seed_error__ = (receiptId: string, message: string) => {
+      addReceipt({
+        id: receiptId, transactionId: transaction.id, imagePath: "/test/seed.jpg",
+        position: receipts.length, scannedAt: 0,
+      });
+      setScanStatus(receiptId, "error", message);
+    };
+    (window as any).__scansplit_seed_empty__ = (receiptId: string) => {
+      addReceipt({
+        id: receiptId, transactionId: transaction.id, imagePath: "/test/seed.jpg",
+        position: receipts.length, scannedAt: 0,
+      });
+      setScanStatus(receiptId, "ok");
+      mergeParsed(receiptId, { merchant: null, items: [] });
+    };
+  }
+
   return (
     <div style={{ padding: 24 }}>
       <h2>Step 1 of 5 — Drop receipts</h2>

@@ -7,3 +7,5 @@ src-tauri/gen
 .superpowers
 .DS_Store
 *.log
+test-results
+playwright-report

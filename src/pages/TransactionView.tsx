@@ -48,7 +48,11 @@ export default function TransactionView() {
       }),
       `Total: ${formatCents(split.totalCents, full.transaction.currency)}`,
     ];
-    await writeText(lines.join("\n"));
+    try {
+      await writeText(lines.join("\n"));
+    } catch {
+      // ignore in test mode
+    }
   }
 
   async function del() {

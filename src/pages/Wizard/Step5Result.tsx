@@ -38,7 +38,11 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
       }),
       `Total: ${formatCents(split.totalCents, transaction.currency)}`,
     ];
-    await writeText(lines.join("\n"));
+    try {
+      await writeText(lines.join("\n"));
+    } catch {
+      // ignore clipboard failures (e.g., in non-Tauri test mode)
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

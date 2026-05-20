@@ -1,0 +1,8 @@
+{
+  "merchant": "Trattoria",
+  "items": [
+    {"raw": "PASTA", "name": "Pasta", "priceCents": 1400, "kind": "item"},
+    {"raw": "WINE", "name": "House Red", "priceCents": 3200, "kind": "item"},
+    {"raw": "TAX", "name": null, "priceCents": 414, "kind": "tax"}
+  ]
+}
