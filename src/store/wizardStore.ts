@@ -20,6 +20,7 @@ interface WizardState {
   people: PersonRecord[];
   step: WizardStep;
   detectedMerchant: string | null;
+  isExisting: boolean;
 
   reset: (id?: string) => void;
   loadFrom: (full: FullTransaction) => void;
@@ -74,6 +75,7 @@ export const useWizardStore = create<WizardState>()(
       people: [],
       step: 1,
       detectedMerchant: null,
+      isExisting: false,
 
       reset: (id) => set({
         transaction: emptyMeta(id),
@@ -84,6 +86,7 @@ export const useWizardStore = create<WizardState>()(
         people: [],
         step: 1,
         detectedMerchant: null,
+        isExisting: false,
       }),
 
       loadFrom: (full) => set({
@@ -95,6 +98,7 @@ export const useWizardStore = create<WizardState>()(
         people: full.people,
         step: 2,
         detectedMerchant: null,
+        isExisting: true,
       }),
 
       setStep: (s) => set({ step: s }),

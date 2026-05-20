@@ -48,8 +48,11 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
     setErr(null);
     try {
       const full = store.toFull();
-      await api.createTransaction(full);
-
+      if (store.isExisting) {
+        await api.updateTransaction(full);
+      } else {
+        await api.createTransaction(full);
+      }
       const corrections: Array<[string, string]> = items
         .filter((i) => i.rawCode && i.name && i.rawCode !== i.name)
         .map((i) => [i.rawCode!, i.name]);
