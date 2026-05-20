@@ -30,6 +30,30 @@ fn mode_x_max(prices: &[&OcrLine]) -> Option<f32> {
     median(prices.iter().map(|l| l.bbox.x_max).collect())
 }
 
+fn classify_kind(text: &str, price_cents: i64) -> Option<&'static str> {
+    let t = text.to_uppercase();
+    // Skip totals entirely — `None` signals "drop this row"
+    if t.contains("SUBTOTAL") || t.contains("NET TOTAL") || t.contains("TOTAL") ||
+       t.contains("BALANCE") || t.contains("AMOUNT DUE") {
+        return None;
+    }
+    if t.contains("TAX") || t.contains("GST") || t.contains("HST") || t.contains("VAT") {
+        return Some("tax");
+    }
+    if t.contains("TIP") || t.contains("GRATUITY") || t.contains("SVC")
+        || t.contains("SERVICE CHG") {
+        return Some("tip");
+    }
+    if t.contains("DISCOUNT") || t.contains("PROMO") || t.contains("COUPON")
+        || t.contains("SAVINGS") || t.contains("OFF") {
+        return Some("discount");
+    }
+    if price_cents < 0 {
+        return Some("discount");
+    }
+    Some("item")
+}
+
 pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
     if lines.is_empty() {
         return ParsedReceipt {
@@ -66,11 +90,21 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
             .max_by_key(|(_, ll)| ll.text.len())
             .map(|(_, ll)| ll.text.clone());
 
+        let combined_text: String = std::iter::once(l.text.as_str())
+            .chain(name_candidate.as_deref())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let kind = match classify_kind(&combined_text, price_cents) {
+            Some(k) => k,
+            None => continue, // SUBTOTAL/TOTAL rows skipped
+        };
+
         items.push(ParsedItem {
             raw: name_candidate.clone().unwrap_or_default(),
             name: name_candidate,
             price_cents,
-            kind: "item".into(),
+            kind: kind.into(),
             confidence: Confidence::High,
             confidence_reasons: vec![],
         });
@@ -120,5 +154,68 @@ mod tests {
         assert_eq!(it.price_cents, 1250);
         assert_eq!(it.name.as_deref(), Some("Caesar Salad"));
         assert_eq!(it.confidence, Confidence::High);
+    }
+
+    #[test]
+    fn tax_keyword_classifies_as_tax() {
+        let lines = vec![
+            line("Caesar Salad",  0.10, 0.30, 0.40),
+            line("12.50",         0.85, 0.30, 0.95),
+            line("TAX",           0.10, 0.50, 0.20),
+            line("1.03",          0.85, 0.50, 0.95),
+        ];
+        let r = parse(lines);
+        let tax = r.items.iter().find(|i| i.kind == "tax").unwrap();
+        assert_eq!(tax.price_cents, 103);
+    }
+
+    #[test]
+    fn tip_keyword_classifies_as_tip() {
+        let lines = vec![
+            line("Burger",       0.10, 0.30, 0.40),
+            line("10.00",        0.85, 0.30, 0.95),
+            line("Tip",          0.10, 0.50, 0.20),
+            line("2.00",         0.85, 0.50, 0.95),
+        ];
+        let r = parse(lines);
+        assert!(r.items.iter().any(|i| i.kind == "tip" && i.price_cents == 200));
+    }
+
+    #[test]
+    fn discount_keyword_classifies_as_discount() {
+        let lines = vec![
+            line("Burger",       0.10, 0.30, 0.40),
+            line("10.00",        0.85, 0.30, 0.95),
+            line("DISCOUNT 10%", 0.10, 0.50, 0.30),
+            line("-1.00",        0.85, 0.50, 0.95),
+        ];
+        let r = parse(lines);
+        assert!(r.items.iter().any(|i| i.kind == "discount" && i.price_cents == -100));
+    }
+
+    #[test]
+    fn negative_price_without_keyword_classifies_as_discount() {
+        let lines = vec![
+            line("Burger",   0.10, 0.30, 0.40),
+            line("10.00",    0.85, 0.30, 0.95),
+            line("Refund",   0.10, 0.50, 0.20),
+            line("-2.00",    0.85, 0.50, 0.95),
+        ];
+        let r = parse(lines);
+        assert!(r.items.iter().any(|i| i.kind == "discount" && i.price_cents == -200));
+    }
+
+    #[test]
+    fn total_subtotal_lines_skipped() {
+        let lines = vec![
+            line("Burger",    0.10, 0.30, 0.40),
+            line("10.00",     0.85, 0.30, 0.95),
+            line("SUBTOTAL",  0.10, 0.50, 0.30),
+            line("10.00",     0.85, 0.50, 0.95),
+            line("TOTAL",     0.10, 0.60, 0.30),
+            line("10.00",     0.85, 0.60, 0.95),
+        ];
+        let r = parse(lines);
+        assert_eq!(r.items.len(), 1, "expected only Burger; SUBTOTAL/TOTAL skipped");
     }
 }
