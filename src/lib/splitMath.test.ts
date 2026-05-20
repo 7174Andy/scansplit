@@ -74,3 +74,21 @@ describe("computeSplit — proportional tax & tip", () => {
     expect(result.perPerson[1].totalCents).toBe(1200);
   });
 });
+
+describe("computeSplit — rounding invariant", () => {
+  it("sum of per-person totals equals sum of input prices (no money lost)", () => {
+    const ps = people("A", "B", "C");
+    const result = computeSplit([item({ id: "i1", priceCents: 1000 })], ps);
+    expect(result.totalCents).toBe(1000);
+    expect(result.perPerson.map((p) => p.totalCents).sort()).toEqual([333, 333, 334]);
+  });
+
+  it("is deterministic across calls", () => {
+    const ps = people("A", "B", "C");
+    const r1 = computeSplit([item({ id: "i1", priceCents: 1000 })], ps);
+    const r2 = computeSplit([item({ id: "i1", priceCents: 1000 })], ps);
+    expect(r1.perPerson.map((p) => p.totalCents)).toEqual(
+      r2.perPerson.map((p) => p.totalCents)
+    );
+  });
+});
