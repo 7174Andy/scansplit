@@ -1,4 +1,5 @@
 pub mod claude;
+pub mod code_expansions;
 
 use serde::{Deserialize, Serialize};
 
