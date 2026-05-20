@@ -1,5 +1,7 @@
 import { useWizardStore } from "../../store/wizardStore";
 import { ItemRow } from "../../components/ItemRow";
+import { Plus, ArrowLeft, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 function newId(): string {
   return crypto.randomUUID();
@@ -11,18 +13,12 @@ export function Step2Items({ onBack, onNext }: { onBack: () => void; onNext: () 
   const hasItem = items.some((i) => i.kind === "item" && i.priceCents >= 0);
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Step 2 of 5 — Confirm items</h2>
-      <p style={{ color: "#888" }}>
+    <div>
+      <p className="text-muted-foreground">
         Fix any OCR mistakes. Edit names and prices, mark tax/tip rows, delete things you don't want.
       </p>
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 120px 120px 30px",
-        gap: 8, padding: "6px 0",
-        color: "#4a9eff", fontWeight: 600,
-      }}>
+      <div className="grid grid-cols-[1fr_120px_120px_30px] gap-2 py-1.5 font-semibold text-primary">
         <span>Item</span><span>Price</span><span>Kind</span><span></span>
       </div>
 
@@ -35,7 +31,9 @@ export function Step2Items({ onBack, onNext }: { onBack: () => void; onNext: () 
         />
       ))}
 
-      <button
+      <Button
+        variant="outline"
+        className="mt-3"
         onClick={() =>
           addItem({
             id: newId(),
@@ -47,14 +45,17 @@ export function Step2Items({ onBack, onNext }: { onBack: () => void; onNext: () 
             assignedPersonIds: [],
           })
         }
-        style={{ marginTop: 12 }}
       >
-        + Add row
-      </button>
+        <Plus className="size-4" /> Add row
+      </Button>
 
-      <div style={{ marginTop: 24, display: "flex", gap: 8 }}>
-        <button onClick={onBack}>← Back</button>
-        <button disabled={!hasItem} onClick={onNext}>Next →</button>
+      <div className="mt-6 flex gap-2">
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="size-4" /> Back
+        </Button>
+        <Button disabled={!hasItem} onClick={onNext}>
+          Next <ArrowRight className="size-4" />
+        </Button>
       </div>
     </div>
   );
