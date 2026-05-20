@@ -1,5 +1,8 @@
 pub mod parser;
 
+#[cfg(target_os = "macos")]
+pub mod apple;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
