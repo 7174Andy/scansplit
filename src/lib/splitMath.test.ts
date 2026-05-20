@@ -92,3 +92,32 @@ describe("computeSplit — rounding invariant", () => {
     );
   });
 });
+
+describe("computeSplit — discounts", () => {
+  it("allocates a discount proportionally as a negative amount", () => {
+    const ps = people("A", "B");
+    const result = computeSplit(
+      [
+        { ...item({ id: "i1", priceCents: 2000 }), assignedPersonIds: ["p0"] },
+        { ...item({ id: "i2", priceCents: 1000 }), assignedPersonIds: ["p1"] },
+        item({ id: "d1", priceCents: -300, kind: "discount" }),
+      ],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(1800);
+    expect(result.perPerson[1].totalCents).toBe(900);
+    expect(result.totalCents).toBe(2700);
+  });
+
+  it("does not produce negative per-person totals on small discounts", () => {
+    const ps = people("A");
+    const result = computeSplit(
+      [
+        item({ id: "i1", priceCents: 1000 }),
+        item({ id: "d1", priceCents: -100, kind: "discount" }),
+      ],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(900);
+  });
+});
