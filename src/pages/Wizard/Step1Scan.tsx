@@ -3,6 +3,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useWizardStore } from "../../store/wizardStore";
 import { ReceiptThumbnail } from "../../components/ReceiptThumbnail";
 import { api } from "../../lib/tauri";
+import { Plus, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 function newId(): string {
   return crypto.randomUUID();
@@ -85,10 +87,14 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Step 1 of 5 — Drop receipts</h2>
-      <button onClick={pickFiles} disabled={picking}>+ Add receipt files</button>
-      <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+    <div>
+      <p className="text-muted-foreground">
+        Drop receipts to extract line items.
+      </p>
+      <Button onClick={pickFiles} disabled={picking}>
+        <Plus className="size-4" /> Add receipt files
+      </Button>
+      <div className="mt-4 flex flex-wrap gap-2">
         {receipts.map((r) => (
           <ReceiptThumbnail
             key={r.id}
@@ -100,8 +106,10 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
           />
         ))}
       </div>
-      <div style={{ marginTop: 24 }}>
-        <button disabled={!allDone} onClick={onNext}>Next →</button>
+      <div className="mt-6">
+        <Button disabled={!allDone} onClick={onNext}>
+          Next <ArrowRight className="size-4" />
+        </Button>
       </div>
     </div>
   );
