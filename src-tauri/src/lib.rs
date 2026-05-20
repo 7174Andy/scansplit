@@ -1,3 +1,4 @@
+pub mod commands;
 pub mod db;
 pub mod error;
 
@@ -23,6 +24,13 @@ pub fn run() {
             });
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            commands::transactions::create_transaction,
+            commands::transactions::update_transaction,
+            commands::transactions::get_transaction,
+            commands::transactions::list_transactions,
+            commands::transactions::delete_transaction,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

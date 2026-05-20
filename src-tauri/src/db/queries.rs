@@ -1,0 +1,217 @@
+use crate::db::models::{FullTransaction, Item, Person, Receipt, Transaction};
+use crate::error::AppResult;
+use sqlx::{Row, SqlitePool};
+
+pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+
+    sqlx::query(
+        "INSERT INTO transactions (id, title, currency, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(&full.transaction.id)
+    .bind(&full.transaction.title)
+    .bind(&full.transaction.currency)
+    .bind(full.transaction.created_at)
+    .bind(full.transaction.updated_at)
+    .execute(&mut *tx)
+    .await?;
+
+    for p in &full.people {
+        sqlx::query(
+            "INSERT INTO transaction_people (id, transaction_id, name, position)
+             VALUES (?, ?, ?, ?)",
+        )
+        .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position)
+        .execute(&mut *tx).await?;
+    }
+
+    for r in &full.receipts {
+        sqlx::query(
+            "INSERT INTO receipts (id, transaction_id, image_path, position, scanned_at)
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(&r.id).bind(&r.transaction_id).bind(&r.image_path)
+        .bind(r.position).bind(r.scanned_at)
+        .execute(&mut *tx).await?;
+    }
+
+    for it in &full.items {
+        sqlx::query(
+            "INSERT INTO items (id, transaction_id, receipt_id, raw_code, name,
+              price_cents, kind, position)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&it.id).bind(&it.transaction_id).bind(&it.receipt_id)
+        .bind(&it.raw_code).bind(&it.name).bind(it.price_cents)
+        .bind(&it.kind).bind(it.position)
+        .execute(&mut *tx).await?;
+
+        for pid in &it.assigned_person_ids {
+            sqlx::query(
+                "INSERT INTO item_assignments (item_id, person_id) VALUES (?, ?)",
+            )
+            .bind(&it.id).bind(pid).execute(&mut *tx).await?;
+        }
+    }
+
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("DELETE FROM items WHERE transaction_id = ?")
+        .bind(&full.transaction.id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM transaction_people WHERE transaction_id = ?")
+        .bind(&full.transaction.id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM receipts WHERE transaction_id = ?")
+        .bind(&full.transaction.id).execute(&mut *tx).await?;
+    sqlx::query(
+        "UPDATE transactions SET title=?, currency=?, updated_at=? WHERE id=?",
+    )
+    .bind(&full.transaction.title).bind(&full.transaction.currency)
+    .bind(full.transaction.updated_at).bind(&full.transaction.id)
+    .execute(&mut *tx).await?;
+    tx.commit().await?;
+
+    let mut tx2 = pool.begin().await?;
+    for p in &full.people {
+        sqlx::query("INSERT INTO transaction_people (id, transaction_id, name, position) VALUES (?, ?, ?, ?)")
+            .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position)
+            .execute(&mut *tx2).await?;
+    }
+    for r in &full.receipts {
+        sqlx::query("INSERT INTO receipts (id, transaction_id, image_path, position, scanned_at) VALUES (?, ?, ?, ?, ?)")
+            .bind(&r.id).bind(&r.transaction_id).bind(&r.image_path).bind(r.position).bind(r.scanned_at)
+            .execute(&mut *tx2).await?;
+    }
+    for it in &full.items {
+        sqlx::query("INSERT INTO items (id, transaction_id, receipt_id, raw_code, name, price_cents, kind, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(&it.id).bind(&it.transaction_id).bind(&it.receipt_id).bind(&it.raw_code)
+            .bind(&it.name).bind(it.price_cents).bind(&it.kind).bind(it.position)
+            .execute(&mut *tx2).await?;
+        for pid in &it.assigned_person_ids {
+            sqlx::query("INSERT INTO item_assignments (item_id, person_id) VALUES (?, ?)")
+                .bind(&it.id).bind(pid).execute(&mut *tx2).await?;
+        }
+    }
+    tx2.commit().await?;
+    Ok(())
+}
+
+pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction> {
+    let row = sqlx::query(
+        "SELECT id, title, currency, created_at, updated_at FROM transactions WHERE id = ?",
+    )
+    .bind(id).fetch_optional(pool).await?;
+    let row = row.ok_or(crate::error::AppError::NotFound)?;
+    let transaction = Transaction {
+        id: row.get("id"),
+        title: row.get("title"),
+        currency: row.get("currency"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    };
+
+    let people: Vec<Person> = sqlx::query(
+        "SELECT id, transaction_id, name, position FROM transaction_people
+         WHERE transaction_id = ? ORDER BY position",
+    )
+    .bind(id)
+    .fetch_all(pool).await?
+    .into_iter()
+    .map(|r| Person {
+        id: r.get("id"), transaction_id: r.get("transaction_id"),
+        name: r.get("name"), position: r.get("position"),
+    })
+    .collect();
+
+    let receipts: Vec<Receipt> = sqlx::query(
+        "SELECT id, transaction_id, image_path, position, scanned_at FROM receipts
+         WHERE transaction_id = ? ORDER BY position",
+    )
+    .bind(id)
+    .fetch_all(pool).await?
+    .into_iter()
+    .map(|r| Receipt {
+        id: r.get("id"), transaction_id: r.get("transaction_id"),
+        image_path: r.get("image_path"), position: r.get("position"),
+        scanned_at: r.get("scanned_at"),
+    })
+    .collect();
+
+    let item_rows = sqlx::query(
+        "SELECT id, transaction_id, receipt_id, raw_code, name, price_cents, kind, position
+         FROM items WHERE transaction_id = ? ORDER BY position",
+    )
+    .bind(id).fetch_all(pool).await?;
+
+    let mut items: Vec<Item> = Vec::with_capacity(item_rows.len());
+    for r in item_rows {
+        let item_id: String = r.get("id");
+        let assigns: Vec<String> = sqlx::query(
+            "SELECT person_id FROM item_assignments WHERE item_id = ?",
+        )
+        .bind(&item_id).fetch_all(pool).await?
+        .into_iter().map(|x| x.get("person_id")).collect();
+        items.push(Item {
+            id: item_id,
+            transaction_id: r.get("transaction_id"),
+            receipt_id: r.get("receipt_id"),
+            raw_code: r.get("raw_code"),
+            name: r.get("name"),
+            price_cents: r.get("price_cents"),
+            kind: r.get("kind"),
+            position: r.get("position"),
+            assigned_person_ids: assigns,
+        });
+    }
+
+    Ok(FullTransaction { transaction, people, receipts, items })
+}
+
+pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSummary>> {
+    let rows = sqlx::query(
+        "SELECT t.id, t.title, t.currency, t.updated_at,
+                COUNT(DISTINCT tp.id) AS people_count,
+                COALESCE(SUM(i.price_cents), 0) AS total_cents
+         FROM transactions t
+         LEFT JOIN transaction_people tp ON tp.transaction_id = t.id
+         LEFT JOIN items i ON i.transaction_id = t.id
+         GROUP BY t.id
+         ORDER BY t.updated_at DESC",
+    )
+    .fetch_all(pool).await?;
+    Ok(rows.into_iter().map(|r| TransactionSummary {
+        id: r.get("id"),
+        title: r.get("title"),
+        currency: r.get("currency"),
+        updated_at: r.get("updated_at"),
+        people_count: r.get("people_count"),
+        total_cents: r.get("total_cents"),
+    }).collect())
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransactionSummary {
+    pub id: String,
+    pub title: String,
+    pub currency: String,
+    pub updated_at: i64,
+    pub people_count: i64,
+    pub total_cents: i64,
+}
+
+pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<Vec<String>> {
+    let paths: Vec<String> = sqlx::query(
+        "SELECT image_path FROM receipts WHERE transaction_id = ?",
+    )
+    .bind(id).fetch_all(pool).await?
+    .into_iter().map(|r| r.get("image_path")).collect();
+
+    sqlx::query("DELETE FROM transactions WHERE id = ?")
+        .bind(id).execute(pool).await?;
+    Ok(paths)
+}
