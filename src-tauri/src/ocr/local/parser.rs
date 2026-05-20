@@ -90,6 +90,23 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
             .max_by_key(|(_, ll)| ll.text.len())
             .map(|(_, ll)| ll.text.clone());
 
+        // Suppression: if the satellite text starts with '(' AND the price text ends with ')',
+        // this is a per-item discount allocation (IKEA-style). Drop it.
+        let right_closes_paren = l.text.trim_end().ends_with(')');
+        let left_opens_paren = name_candidate.as_deref()
+            .map(|s| s.trim_start().starts_with('('))
+            .unwrap_or(false);
+        if left_opens_paren && right_closes_paren {
+            continue;
+        }
+        // If the name candidate starts with '(' but this price line doesn't end with ')',
+        // the candidate belongs to the parenthetical allocation row — don't use it.
+        let name_candidate = if left_opens_paren && !right_closes_paren {
+            None
+        } else {
+            name_candidate
+        };
+
         let combined_text: String = std::iter::once(l.text.as_str())
             .chain(name_candidate.as_deref())
             .collect::<Vec<_>>()
@@ -217,5 +234,27 @@ mod tests {
         ];
         let r = parse(lines);
         assert_eq!(r.items.len(), 1, "expected only Burger; SUBTOTAL/TOTAL skipped");
+    }
+
+    #[test]
+    fn parenthetical_per_item_allocation_is_suppressed() {
+        let lines = vec![
+            // real items
+            line("DRONA NN box",    0.10, 0.30, 0.40),
+            line("4.99",            0.85, 0.30, 0.95),
+            // per-item discount allocation — should be DROPPED
+            line("(US S&S $10 off", 0.10, 0.32, 0.40),
+            line("-0.34)",          0.85, 0.32, 0.95),
+            // real total discount — should be KEPT as kind=discount
+            line("US S&S $10 off",  0.10, 0.70, 0.40),
+            line("-10.00",          0.85, 0.70, 0.95),
+        ];
+        let r = parse(lines);
+        // Exactly one discount (-10.00). The -0.34 allocation is dropped.
+        let discounts: Vec<&ParsedItem> = r.items.iter().filter(|i| i.kind == "discount").collect();
+        assert_eq!(discounts.len(), 1);
+        assert_eq!(discounts[0].price_cents, -1000);
+        // DRONA still there
+        assert!(r.items.iter().any(|i| i.kind == "item" && i.price_cents == 499));
     }
 }
