@@ -3,6 +3,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import Home from "./pages/Home";
 import Settings from "./pages/Settings";
 import Wizard from "./pages/Wizard";
+import TransactionView from "./pages/TransactionView";
 
 export default function App() {
   return (
@@ -12,7 +13,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/transaction/new" element={<Wizard />} />
-          <Route path="/transaction/:id" element={<div>Saved transaction view coming in Task 22</div>} />
+          <Route path="/transaction/:id" element={<TransactionView />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
