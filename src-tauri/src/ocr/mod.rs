@@ -39,8 +39,8 @@ pub struct ParsedReceipt {
 }
 
 #[async_trait::async_trait]
-pub trait LlmClient: Send + Sync {
-    async fn scan(&self, image_bytes: &[u8], api_key: &str) -> crate::error::AppResult<ParsedReceipt>;
+pub trait Scanner: Send + Sync {
+    async fn scan(&self, image_bytes: &[u8]) -> crate::error::AppResult<ParsedReceipt>;
 }
 
 #[cfg(test)]

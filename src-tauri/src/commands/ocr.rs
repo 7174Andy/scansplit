@@ -1,7 +1,7 @@
 use crate::error::{AppError, AppResult};
-use crate::ocr::claude::ClaudeClient;
+use crate::ocr::claude::ClaudeScanner;
 use crate::ocr::code_expansions;
-use crate::ocr::{LlmClient, ParsedReceipt};
+use crate::ocr::{Scanner, ParsedReceipt};
 use crate::AppState;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
@@ -25,8 +25,8 @@ pub async fn scan_receipt(
     let key = crate::commands::settings::read_api_key()?
         .ok_or(AppError::MissingApiKey)?;
 
-    let client = ClaudeClient::new();
-    let mut parsed: ParsedReceipt = client.scan(&bytes, &key).await?;
+    let scanner = ClaudeScanner::new(key);
+    let mut parsed: ParsedReceipt = scanner.scan(&bytes).await?;
     code_expansions::apply_learned(&state.pool, &mut parsed).await?;
 
     Ok(ScanResult {
