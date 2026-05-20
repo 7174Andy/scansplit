@@ -1,12 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const sample = JSON.parse(
-  readFileSync(join(__dirname, "fixtures", "sample.json"), "utf-8")
-);
+import sample from "./fixtures/sample.json" with { type: "json" };
 
 test("happy path: scan → confirm → people → assign → copy", async ({ page }) => {
   await page.goto("/");
@@ -97,4 +90,45 @@ test("subset assignment: one person excluded from an item", async ({ page }) => 
   await expect(page.getByText(/\$15\.00/).first()).toBeVisible();
   const cara = page.locator("summary", { hasText: /^Cara/ });
   await expect(cara).toContainText(/\$0\.00/);
+});
+
+test("empty OCR: user adds items by hand", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "+ New Split" }).click();
+  await page.evaluate(() => (window as any).__scansplit_seed_empty__("r-empty"));
+  await page.getByRole("button", { name: "Next →" }).click();
+
+  await page.getByRole("button", { name: "+ Add row" }).click();
+  const inputs = page.locator("input");
+  await inputs.first().fill("Manual item");
+  await inputs.nth(1).fill("10.00");
+  await inputs.nth(1).blur();
+
+  await page.getByRole("button", { name: "Next →" }).click();
+  await page.getByPlaceholder("Name").fill("Alice");
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByRole("button", { name: "Next →" }).click();
+  await page.getByRole("button", { name: "Next →" }).click();
+
+  await expect(page.getByText(/\$10\.00/).first()).toBeVisible();
+});
+
+test("OCR retry: failed scan can be retried", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "+ New Split" }).click();
+  await page.evaluate(() =>
+    (window as any).__scansplit_seed_error__("r-fail", "network unreachable")
+  );
+
+  await expect(page.getByText(/network unreachable/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Next →" })).toBeDisabled();
+
+  // Simulate retry succeeding via a fresh seed call.
+  await page.evaluate(() => {
+    (window as any).__scansplit_seed_empty__("r-fail-retry");
+  });
+  // Remove the failed thumbnail so allDone becomes true.
+  await page.getByText(/network unreachable/).locator("..").getByRole("button", { name: "Remove" }).click();
+  await page.getByRole("button", { name: "Next →" }).click();
+  await expect(page.getByRole("heading", { name: /Step 2 of 5/ })).toBeVisible();
 });
