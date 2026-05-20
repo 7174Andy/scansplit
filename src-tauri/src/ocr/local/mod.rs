@@ -3,6 +3,9 @@ pub mod parser;
 #[cfg(target_os = "macos")]
 pub mod apple;
 
+#[cfg(not(target_os = "macos"))]
+pub mod tesseract;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
