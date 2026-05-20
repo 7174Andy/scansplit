@@ -61,9 +61,11 @@ export default function Settings() {
 
       <h1 className="mt-6 text-3xl font-bold">Settings</h1>
 
-      <h3 className="mt-4 text-lg font-semibold">Anthropic API key</h3>
+      <h3 className="mt-4 text-lg font-semibold">Optional: Claude rescan (advanced)</h3>
       <p className="text-muted-foreground">
-        Stored in your OS keychain. Used for receipt OCR via Claude.
+        ScanSplit reads receipts locally and works offline. You only need a
+        Claude key if you want a fallback for unusually messy receipts. Most
+        users won't need this.
       </p>
       <p className="my-2 inline-flex items-center gap-1.5">
         {hasKey === null ? (
