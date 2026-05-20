@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { UserPlus, ArrowLeft, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useWizardStore } from "../../store/wizardStore";
 import { PersonChip } from "../../components/PersonChip";
 
@@ -14,28 +17,32 @@ export function Step3People({ onBack, onNext }: { onBack: () => void; onNext: ()
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Step 3 of 5 — Add people</h2>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input
+    <div>
+      <div className="flex gap-2">
+        <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
           placeholder="Name"
-          style={{ padding: 6 }}
         />
-        <button onClick={commit}>+ Add</button>
+        <Button onClick={commit}>
+          <UserPlus className="size-4" /> Add
+        </Button>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+      <div className="mt-4 flex flex-wrap gap-2">
         {people.map((p) => (
           <PersonChip key={p.id} name={p.name} onRemove={() => removePerson(p.id)} />
         ))}
       </div>
 
-      <div style={{ marginTop: 24, display: "flex", gap: 8 }}>
-        <button onClick={onBack}>← Back</button>
-        <button disabled={people.length === 0} onClick={onNext}>Next →</button>
+      <div className="mt-6 flex gap-2">
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="size-4" /> Back
+        </Button>
+        <Button disabled={people.length === 0} onClick={onNext}>
+          Next <ArrowRight className="size-4" />
+        </Button>
       </div>
     </div>
   );
