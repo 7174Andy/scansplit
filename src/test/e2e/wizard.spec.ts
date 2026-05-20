@@ -120,6 +120,8 @@ test("OCR retry: failed scan can be retried", async ({ page }) => {
     (window as any).__scansplit_seed_error__("r-fail", "network unreachable")
   );
 
+  // Error now surfaces in the non-modal dialog, not inline on the thumbnail.
+  await expect(page.getByRole("heading", { name: "Scan failed" })).toBeVisible();
   await expect(page.getByText(/network unreachable/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Next" })).toBeDisabled();
 
@@ -127,8 +129,9 @@ test("OCR retry: failed scan can be retried", async ({ page }) => {
   await page.evaluate(() => {
     (window as any).__scansplit_seed_empty__("r-fail-retry");
   });
-  // Remove the failed thumbnail so allDone becomes true.
-  await page.getByText(/network unreachable/).locator("..").getByRole("button", { name: "Remove receipt" }).click();
+  // Remove the failed receipt via the dialog's Remove button.
+  const errorDialog = page.locator("[data-state=open]").filter({ hasText: "Scan failed" });
+  await errorDialog.getByRole("button", { name: "Remove", exact: true }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByRole("button", { name: "Add row" })).toBeVisible();
 });
