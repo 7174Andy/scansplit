@@ -1,8 +1,10 @@
 # Dark-mode UI overhaul — design spec
 
 **Date:** 2026-05-19
-**Status:** Draft (awaiting review)
+**Status:** Approved (design intent stable; implementation pivoted)
 **Scope:** Visual styling only. No new features, no layout restructuring beyond a stepper, no light-mode support.
+
+> **Decision log (2026-05-19, mid-execution):** Initial implementation rolled hand-written CSS variables and a custom `<Button>` component. We pivoted to **shadcn/ui** (Tailwind + Radix primitives + `lucide-react` icons) so that we don't maintain the design system ourselves. The design intent described below is unchanged — only the implementation surface differs. Token names map to shadcn defaults (e.g., `--accent` → `--primary`, `--text` → `--foreground`); see the v2 plan for the mapping table.
 
 ## Problem
 
