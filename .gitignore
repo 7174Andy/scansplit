@@ -3,6 +3,7 @@ dist
 .vite
 src-tauri/target
 src-tauri/Cargo.lock
+src-tauri/gen
 .superpowers
 .DS_Store
 *.log
