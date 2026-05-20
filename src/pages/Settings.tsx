@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { api } from "../lib/tauri";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Check, X, Trash2, Pencil } from "lucide-react";
+import { api } from "@/lib/tauri";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function Settings() {
+  const navigate = useNavigate();
   const [key, setKey] = useState("");
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [saved, setSaved] = useState(false);
@@ -12,15 +16,17 @@ export default function Settings() {
     api.getApiKey().then((k) => setHasKey(!!k));
   }, []);
 
-  async function save() {
+  async function save(): Promise<boolean> {
     setErr(null);
     try {
       await api.setApiKey(key);
       setSaved(true);
       setHasKey(true);
       setKey("");
+      return true;
     } catch (e: any) {
       setErr(String(e?.message ?? e));
+      return false;
     }
   }
 
@@ -33,30 +39,75 @@ export default function Settings() {
     }
   }
 
-  return (
-    <div style={{ padding: 32, maxWidth: 600, margin: "0 auto" }}>
-      <Link to="/">← Back</Link>
-      <h1>Settings</h1>
+  async function backOrSaveAndBack() {
+    if (key.length > 0) {
+      const ok = await save();
+      if (!ok) return;
+    }
+    navigate("/");
+  }
 
-      <h3>Anthropic API key</h3>
-      <p style={{ color: "#888" }}>
+  const dirty = key.length > 0;
+
+  return (
+    <div className="mx-auto max-w-xl p-8">
+      <Button
+        variant={dirty ? "default" : "ghost"}
+        onClick={backOrSaveAndBack}
+      >
+        {dirty ? <Check className="size-4" /> : <ArrowLeft className="size-4" />}
+        {dirty ? "Save & Back" : "Back"}
+      </Button>
+
+      <h1 className="mt-6 text-3xl font-bold">Settings</h1>
+
+      <h3 className="mt-4 text-lg font-semibold">Anthropic API key</h3>
+      <p className="text-muted-foreground">
         Stored in your OS keychain. Used for receipt OCR via Claude.
       </p>
-      <p>{hasKey === null ? "Checking…" : hasKey ? "✅ Key configured" : "❌ No key set"}</p>
+      <p className="my-2 inline-flex items-center gap-1.5">
+        {hasKey === null ? (
+          <span className="text-muted-foreground">Checking…</span>
+        ) : hasKey ? (
+          <span className="inline-flex items-center gap-1.5 text-success">
+            <Check className="size-4" /> Key configured
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <X className="size-4" /> No key set
+          </span>
+        )}
+      </p>
 
-      <input
+      <Input
         type="password"
         placeholder="sk-ant-…"
         value={key}
         onChange={(e) => setKey(e.target.value)}
-        style={{ width: "100%", padding: 8, marginBottom: 8 }}
+        className="mb-2"
       />
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={save} disabled={!key}>Save</button>
-        {hasKey && <button onClick={remove}>Remove key</button>}
+
+      <div className="flex items-center gap-2">
+        <Button onClick={save} disabled={!key}>
+          <Check className="size-4" /> Save
+        </Button>
+        {hasKey && (
+          <Button variant="destructive" onClick={remove}>
+            <Trash2 className="size-4" /> Remove key
+          </Button>
+        )}
+        {dirty && (
+          <span className="inline-flex items-center gap-1 text-[13px] text-muted-foreground">
+            <Pencil className="size-3.5" /> Unsaved
+          </span>
+        )}
+        {saved && !dirty && (
+          <span className="inline-flex items-center gap-1 text-[13px] text-success">
+            <Check className="size-3.5" /> Saved
+          </span>
+        )}
       </div>
-      {saved && <p style={{ color: "#6ec96e" }}>Saved.</p>}
-      {err && <p style={{ color: "#e07a7a" }}>{err}</p>}
+      {err && <p className="mt-2 text-destructive">{err}</p>}
     </div>
   );
 }
