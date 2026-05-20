@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod db;
 pub mod error;
+pub mod ocr;
 
 use sqlx::SqlitePool;
 use tauri::Manager;

@@ -1,0 +1,9 @@
+{
+  "merchant": "Trader Joe's",
+  "items": [
+    {"raw": "GV WHL MLK 2%", "name": "Whole Milk 2%", "priceCents": 349, "kind": "item"},
+    {"raw": "ORG BAN", "name": "Organic Bananas", "priceCents": 199, "kind": "item"},
+    {"raw": "MISC", "name": null, "priceCents": 499, "kind": "item"},
+    {"raw": "TAX", "name": null, "priceCents": 45, "kind": "tax"}
+  ]
+}
