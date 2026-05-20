@@ -127,6 +127,39 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
         });
     }
 
+    // Priceless-item detection: any line beginning with "Article" that has no
+    // priced satellite within ±(2 * line_height) becomes a Low-confidence item.
+    let article_re = Regex::new(r"^Article\s+\d+").unwrap();
+    for (i, l) in lines.iter().enumerate() {
+        if !article_re.is_match(l.text.trim()) { continue; }
+
+        let has_priced_satellite = lines.iter().enumerate().any(|(j, ll)| {
+            j != i
+                && (ll.bbox.y_min - l.bbox.y_min).abs() <= window
+                && in_price_col(ll)
+                && extract_price_cents(&ll.text).is_some()
+        });
+        if has_priced_satellite { continue; }
+
+        // Find a name line on the left, immediately adjacent (within window)
+        let name_line = lines.iter().enumerate()
+            .filter(|(j, ll)| *j != i
+                && (ll.bbox.y_min - l.bbox.y_min).abs() <= window
+                && !article_re.is_match(ll.text.trim())
+                && extract_price_cents(&ll.text).is_none())
+            .max_by_key(|(_, ll)| ll.text.len())
+            .map(|(_, ll)| ll.text.clone());
+
+        items.push(ParsedItem {
+            raw: l.text.clone(),
+            name: name_line,
+            price_cents: 0,
+            kind: "item".into(),
+            confidence: Confidence::Low,
+            confidence_reasons: vec!["price missing".into()],
+        });
+    }
+
     ParsedReceipt {
         merchant: None,
         items,
@@ -256,5 +289,25 @@ mod tests {
         assert_eq!(discounts[0].price_cents, -1000);
         // DRONA still there
         assert!(r.items.iter().any(|i| i.kind == "item" && i.price_cents == 499));
+    }
+
+    #[test]
+    fn priceless_item_flagged_low_with_zero_price() {
+        let lines = vec![
+            // priced item to seed price-column detection
+            line("Burger",          0.10, 0.30, 0.40),
+            line("10.00",           0.85, 0.30, 0.95),
+            // priceless item — article + name, no price
+            line("Article 12345",   0.10, 0.50, 0.40),
+            line("CITRONHAJ s&p",   0.10, 0.51, 0.40),
+            // sentinel that another priced row comes after
+            line("Salad",           0.10, 0.70, 0.40),
+            line("8.00",            0.85, 0.70, 0.95),
+        ];
+        let r = parse(lines);
+        let priceless: Vec<&ParsedItem> = r.items.iter().filter(|i| i.price_cents == 0).collect();
+        assert_eq!(priceless.len(), 1, "expected one priceless item");
+        assert_eq!(priceless[0].confidence, Confidence::Low);
+        assert!(priceless[0].name.as_deref().unwrap().contains("CITRONHAJ"));
     }
 }
