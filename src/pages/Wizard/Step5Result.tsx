@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Copy as CopyIcon, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useWizardStore } from "../../store/wizardStore";
 import { computeSplit } from "../../lib/splitMath";
 import { SplitTotalsTable } from "../../components/SplitTotalsTable";
@@ -72,14 +75,13 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Step 5 of 5 — Result</h2>
-      <label style={{ display: "block", marginBottom: 12 }}>
+    <div>
+      <label className="mb-3 block">
         Title:&nbsp;
-        <input
+        <Input
           value={transaction.title}
           onChange={(e) => setTitle(e.target.value)}
-          style={{ padding: 6, width: 320 }}
+          className="inline-block w-80"
         />
       </label>
 
@@ -90,12 +92,19 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
         currency={transaction.currency}
       />
 
-      <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
-        <button onClick={onBack}>← Back</button>
-        <button onClick={copy}>{copied ? "Copied ✓" : "📋 Copy"}</button>
-        <button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+      <div className="mt-6 flex gap-2">
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="size-4" /> Back
+        </Button>
+        <Button variant="outline" onClick={copy}>
+          {copied ? <Check className="size-4" /> : <CopyIcon className="size-4" />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+        <Button onClick={save} disabled={saving}>
+          <Check className="size-4" /> {saving ? "Saving…" : "Save"}
+        </Button>
       </div>
-      {err && <p style={{ color: "#e07a7a" }}>{err}</p>}
+      {err && <p className="mt-2 text-destructive">{err}</p>}
     </div>
   );
 }
