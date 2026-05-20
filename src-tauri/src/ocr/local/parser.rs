@@ -197,8 +197,21 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
         }
     }
 
+    let merchant: Option<String> = {
+        let first_priced_y = priced.first().map(|l| l.bbox.y_min).unwrap_or(1.0);
+        lines.iter()
+            .filter(|l| l.bbox.y_min < first_priced_y)
+            .find(|l| {
+                let t = l.text.trim();
+                t.len() > 3
+                    && t.chars().filter(|c| c.is_alphabetic()).count() as f32
+                        / t.chars().count() as f32 > 0.5
+            })
+            .map(|l| l.text.trim().to_string())
+    };
+
     ParsedReceipt {
-        merchant: None,
+        merchant,
         items,
         totals_reconciled,
         parsed_total_cents,
@@ -371,6 +384,18 @@ mod tests {
         ];
         let r = parse(lines);
         assert!(r.totals_reconciled, "1-cent mismatch should still reconcile");
+    }
+
+    #[test]
+    fn merchant_extracted_from_first_alphabetic_header_line() {
+        let lines = vec![
+            line("IKEA San Diego",       0.40, 0.05, 0.60),
+            line("Mon - Sat 10am-9pm",   0.35, 0.07, 0.60),
+            line("Burger",               0.10, 0.30, 0.40),
+            line("10.00",                0.85, 0.30, 0.95),
+        ];
+        let r = parse(lines);
+        assert_eq!(r.merchant.as_deref(), Some("IKEA San Diego"));
     }
 
     #[test]
