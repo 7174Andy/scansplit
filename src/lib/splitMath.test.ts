@@ -1,7 +1,32 @@
 import { describe, it, expect } from "vitest";
+import { computeSplit } from "./splitMath";
+import type { LineItem, Person } from "./types";
 
-describe("smoke", () => {
-  it("vitest runs", () => {
-    expect(1 + 1).toBe(2);
+const people = (...names: string[]): Person[] =>
+  names.map((n, i) => ({ id: `p${i}`, name: n }));
+
+const item = (
+  overrides: Partial<LineItem> & Pick<LineItem, "id" | "priceCents">
+): LineItem => ({
+  name: "Item",
+  kind: "item",
+  assignedPersonIds: [],
+  ...overrides,
+});
+
+describe("computeSplit — even N-way", () => {
+  it("splits one item evenly across all people when assignment is empty", () => {
+    const result = computeSplit(
+      [item({ id: "i1", priceCents: 1500 })],
+      people("A", "B", "C")
+    );
+    expect(result.totalCents).toBe(1500);
+    expect(result.perPerson.map((p) => p.totalCents)).toEqual([500, 500, 500]);
+  });
+
+  it("returns one person owing zero when there are no items", () => {
+    const result = computeSplit([], people("A"));
+    expect(result.totalCents).toBe(0);
+    expect(result.perPerson[0].totalCents).toBe(0);
   });
 });
