@@ -959,6 +959,9 @@ pub enum AppError {
     #[error("database error: {0}")]
     Db(#[from] sqlx::Error),
 
+    #[error("migrate error: {0}")]
+    Migrate(#[from] sqlx::migrate::MigrateError),
+
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -1000,6 +1003,7 @@ impl Serialize for AppError {
 fn error_code(e: &AppError) -> &'static str {
     match e {
         AppError::Db(_) => "DB",
+        AppError::Migrate(_) => "MIGRATE",
         AppError::Io(_) => "IO",
         AppError::Http(_) => "HTTP",
         AppError::Keyring(_) => "KEYRING",
