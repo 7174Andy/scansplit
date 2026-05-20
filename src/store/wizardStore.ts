@@ -162,26 +162,51 @@ export const useWizardStore = create<WizardState>()(
         ],
       })),
 
-      removePerson: (id) => set((st) => ({
-        people: st.people.filter((p) => p.id !== id),
-        items: st.items.map((i) => ({
-          ...i,
-          assignedPersonIds: i.assignedPersonIds.filter((p) => p !== id),
-        })),
-      })),
+      removePerson: (id) => set((st) => {
+        const remainingIds = st.people
+          .filter((p) => p.id !== id)
+          .map((p) => p.id);
+        return {
+          people: st.people.filter((p) => p.id !== id),
+          items: st.items.map((i) => {
+            const filtered = i.assignedPersonIds.filter((p) => p !== id);
+            const isEveryone =
+              remainingIds.length > 1 &&
+              filtered.length === remainingIds.length &&
+              remainingIds.every((rid) => filtered.includes(rid));
+            return { ...i, assignedPersonIds: isEveryone ? [] : filtered };
+          }),
+        };
+      }),
 
-      toggleAssignment: (itemId, personId) => set((st) => ({
-        items: st.items.map((i) => {
-          if (i.id !== itemId) return i;
-          const has = i.assignedPersonIds.includes(personId);
-          return {
-            ...i,
-            assignedPersonIds: has
-              ? i.assignedPersonIds.filter((p) => p !== personId)
-              : [...i.assignedPersonIds, personId],
-          };
-        }),
-      })),
+      toggleAssignment: (itemId, personId) => set((st) => {
+        const allIds = st.people.map((p) => p.id);
+        return {
+          items: st.items.map((i) => {
+            if (i.id !== itemId) return i;
+            // With 2+ people, an empty array visually means "all chips active".
+            // Clicking a chip should deselect that one person, so expand to
+            // the explicit set before toggling.
+            const expandEmpty =
+              i.assignedPersonIds.length === 0 && allIds.length > 1;
+            const current = expandEmpty ? allIds : i.assignedPersonIds;
+            const has = current.includes(personId);
+            let next = has
+              ? current.filter((p) => p !== personId)
+              : [...current, personId];
+            // Canonicalize "everyone selected" back to [] so the UI label
+            // reads "All" and the convention in splitMath holds.
+            if (
+              allIds.length > 1 &&
+              next.length === allIds.length &&
+              allIds.every((id) => next.includes(id))
+            ) {
+              next = [];
+            }
+            return { ...i, assignedPersonIds: next };
+          }),
+        };
+      }),
 
       setTitle: (t) => set((st) => ({
         transaction: { ...st.transaction, title: t, updatedAt: now() },

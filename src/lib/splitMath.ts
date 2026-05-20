@@ -3,12 +3,15 @@ export type { SplitResult } from "./types";
 
 /**
  * Split `amountCents` among `sharerIds` using the largest-remainder method.
- * Returns a map from personId to integer-cent share. Sum equals amountCents exactly.
- * Deterministic: same input always yields same output (sharerIds order is the tiebreaker).
+ * `rotation` shifts which sharer receives the first leftover cent, so callers
+ * can round-robin across many items and keep per-person totals balanced
+ * (without it the same sharer collects every odd cent).
+ * Sum equals amountCents exactly. Deterministic for any (amount, sharers, rotation).
  */
 function allocate(
   amountCents: number,
-  sharerIds: string[]
+  sharerIds: string[],
+  rotation: number = 0
 ): Map<string, number> {
   const n = sharerIds.length;
   const sign = amountCents < 0 ? -1 : 1;
@@ -18,7 +21,7 @@ function allocate(
   const out = new Map<string, number>();
   for (const id of sharerIds) out.set(id, sign * base);
   for (let i = 0; i < remainder; i++) {
-    const id = sharerIds[i];
+    const id = sharerIds[(i + rotation) % n];
     out.set(id, out.get(id)! + sign);
   }
   return out;
@@ -76,14 +79,17 @@ export function computeSplit(
     ])
   );
 
-  // Pass 1: items, exact-sum allocation.
+  // Pass 1: items, exact-sum allocation. itemSeq rotates the leftover-cent
+  // recipient across items so person 0 doesn't always collect the odd cents.
+  let itemSeq = 0;
   for (const it of items) {
     if (it.kind !== "item") continue;
     const sharers =
       it.assignedPersonIds.length === 0
         ? people.map((p) => p.id)
         : it.assignedPersonIds;
-    const shares = allocate(it.priceCents, sharers);
+    const shares = allocate(it.priceCents, sharers, itemSeq);
+    itemSeq++;
     for (const [pid, share] of shares) {
       const t = totals.get(pid)!;
       t.totalCents += share;

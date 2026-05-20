@@ -91,6 +91,33 @@ describe("computeSplit — rounding invariant", () => {
       r2.perPerson.map((p) => p.totalCents)
     );
   });
+
+  it("rotates the leftover cent across items so two people split evenly", () => {
+    // Two odd-cent items split 2 ways: without rotation, A would always
+    // collect the +1¢ on both items. With rotation, item 0 → A, item 1 → B.
+    const ps = people("A", "B");
+    const result = computeSplit(
+      [
+        item({ id: "i1", priceCents: 349 }),
+        item({ id: "i2", priceCents: 349 }),
+      ],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(349);
+    expect(result.perPerson[1].totalCents).toBe(349);
+  });
+
+  it("bounds the imbalance between two people to at most 1 cent across many items", () => {
+    const ps = people("A", "B");
+    const items = Array.from({ length: 7 }, (_, idx) =>
+      item({ id: `i${idx}`, priceCents: 349 })
+    );
+    const result = computeSplit(items, ps);
+    const diff = Math.abs(
+      result.perPerson[0].totalCents - result.perPerson[1].totalCents
+    );
+    expect(diff).toBeLessThanOrEqual(1);
+  });
 });
 
 describe("computeSplit — discounts", () => {

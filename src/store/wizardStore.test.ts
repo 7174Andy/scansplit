@@ -39,6 +39,32 @@ describe("wizardStore", () => {
     expect(useWizardStore.getState().items[0].assignedPersonIds).toEqual([]);
   });
 
+  it("toggleAssignment canonicalizes 'all selected' back to []", () => {
+    const s = useWizardStore.getState();
+    s.addPerson("Alice");
+    s.addPerson("Bob");
+    const [alice, bob] = useWizardStore.getState().people;
+    s.addItem({
+      id: "i1", transactionId: "t", name: "Pasta", priceCents: 1400,
+      kind: "item", position: 0, assignedPersonIds: [alice.id],
+    });
+    useWizardStore.getState().toggleAssignment("i1", bob.id);
+    expect(useWizardStore.getState().items[0].assignedPersonIds).toEqual([]);
+  });
+
+  it("toggleAssignment on an 'all selected' item deselects just that person", () => {
+    const s = useWizardStore.getState();
+    s.addPerson("Alice");
+    s.addPerson("Bob");
+    const [alice, bob] = useWizardStore.getState().people;
+    s.addItem({
+      id: "i1", transactionId: "t", name: "Pasta", priceCents: 1400,
+      kind: "item", position: 0, assignedPersonIds: [],
+    });
+    useWizardStore.getState().toggleAssignment("i1", alice.id);
+    expect(useWizardStore.getState().items[0].assignedPersonIds).toEqual([bob.id]);
+  });
+
   it("removePerson cascades to item assignments", () => {
     const s = useWizardStore.getState();
     s.addPerson("Alice");
