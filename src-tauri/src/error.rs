@@ -29,6 +29,9 @@ pub enum AppError {
     #[error("ocr parse error: {0}")]
     OcrParse(String),
 
+    #[error("unsupported image format: {0}")]
+    UnsupportedImageFormat(String),
+
     #[error("not found")]
     NotFound,
 
@@ -57,6 +60,7 @@ fn error_code(e: &AppError) -> &'static str {
         AppError::InvalidApiKey => "INVALID_API_KEY",
         AppError::RateLimited(_) => "RATE_LIMITED",
         AppError::OcrParse(_) => "OCR_PARSE",
+        AppError::UnsupportedImageFormat(_) => "UNSUPPORTED_IMAGE_FORMAT",
         AppError::NotFound => "NOT_FOUND",
         AppError::Other(_) => "OTHER",
     }
