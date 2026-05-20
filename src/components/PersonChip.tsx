@@ -1,3 +1,6 @@
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+
 interface Props {
   name: string;
   onRemove?: () => void;
@@ -9,26 +12,22 @@ export function PersonChip({ name, onRemove, active, onClick }: Props) {
   return (
     <span
       onClick={onClick}
-      style={{
-        padding: "5px 10px",
-        background: active ? "#4a9eff" : "#2a2a2a",
-        color: active ? "white" : "inherit",
-        borderRadius: 16,
-        border: "1px solid " + (active ? "#4a9eff" : "#3a3a3a"),
-        fontSize: 13,
-        display: "inline-flex",
-        gap: 6,
-        alignItems: "center",
-        cursor: onClick ? "pointer" : "default",
-      }}
+      className={cn(
+        "inline-flex select-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm",
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-secondary text-foreground",
+        onClick ? "cursor-pointer" : "cursor-default",
+      )}
     >
       {name}
       {onRemove && (
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}
+          aria-label={`Remove ${name}`}
+          className="inline-flex cursor-pointer items-center border-0 bg-transparent p-0 text-current"
         >
-          ✕
+          <X className="size-3" />
         </button>
       )}
     </span>
