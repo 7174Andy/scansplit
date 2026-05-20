@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useWizardStore } from "../../store/wizardStore";
 import { computeSplit } from "../../lib/splitMath";
 import { formatCents } from "../../lib/formatCurrency";
@@ -22,26 +24,23 @@ export function Step4Assign({ onBack, onNext }: { onBack: () => void; onNext: ()
   }, [items, people]);
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Step 4 of 5 — Assign items</h2>
-      <p style={{ color: "#888" }}>
+    <div>
+      <p className="text-muted-foreground">
         Click a person to toggle. Empty = shared by everyone. Tax/tip/discount auto-allocate proportionally.
       </p>
 
       {items.filter((i) => i.kind === "item").map((it) => (
-        <div key={it.id} style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 80px 2fr",
-          gap: 12, padding: "10px 0", borderBottom: "1px solid #2a2a2a",
-        }}>
+        <div key={it.id} className="grid grid-cols-[1fr_80px_2fr] gap-3 border-b border-border py-2.5">
           <div>
             <div>{it.name}</div>
-            <div style={{ color: "#888", fontSize: 12 }}>{formatCents(it.priceCents, transaction.currency)}</div>
+            <div className="text-[13px] text-muted-foreground">
+              {formatCents(it.priceCents, transaction.currency)}
+            </div>
           </div>
-          <div style={{ color: "#666", fontSize: 12 }}>
+          <div className="text-[13px] text-muted-foreground">
             {it.assignedPersonIds.length === 0 ? "All" : `${it.assignedPersonIds.length}/${people.length}`}
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div className="flex flex-wrap gap-1.5">
             {people.map((p) => (
               <PersonChip
                 key={p.id}
@@ -57,9 +56,9 @@ export function Step4Assign({ onBack, onNext }: { onBack: () => void; onNext: ()
         </div>
       ))}
 
-      <div style={{ marginTop: 24, padding: "12px 0", borderTop: "1px solid #444" }}>
+      <div className="mt-6 border-t border-border py-3">
         <strong>Running totals</strong>
-        <div style={{ display: "flex", gap: 16, marginTop: 6, flexWrap: "wrap" }}>
+        <div className="mt-1.5 flex flex-wrap gap-4">
           {split.perPerson.map((p) => {
             const name = people.find((x) => x.id === p.personId)?.name ?? "?";
             return (
@@ -71,9 +70,13 @@ export function Step4Assign({ onBack, onNext }: { onBack: () => void; onNext: ()
         </div>
       </div>
 
-      <div style={{ marginTop: 24, display: "flex", gap: 8 }}>
-        <button onClick={onBack}>← Back</button>
-        <button onClick={onNext}>Next →</button>
+      <div className="mt-6 flex gap-2">
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="size-4" /> Back
+        </Button>
+        <Button onClick={onNext}>
+          Next <ArrowRight className="size-4" />
+        </Button>
       </div>
     </div>
   );
