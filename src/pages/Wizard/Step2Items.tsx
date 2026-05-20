@@ -26,7 +26,7 @@ export function Step2Items({ onBack, onNext }: { onBack: () => void; onNext: () 
       {items.map((it) => (
         <div key={it.id}>
           <div className="flex items-center gap-2">
-            <ConfidenceDot confidence={it.confidence} reasons={it.confidenceReasons} />
+            <ConfidenceDot confidence={it.confidence ?? "high"} reasons={it.confidenceReasons} />
             <div className="flex-1">
               <ItemRow
                 item={it}
@@ -35,9 +35,9 @@ export function Step2Items({ onBack, onNext }: { onBack: () => void; onNext: () 
               />
             </div>
           </div>
-          {it.confidence !== "high" && it.confidenceReasons.length > 0 && (
+          {(it.confidence ?? "high") !== "high" && (it.confidenceReasons?.length ?? 0) > 0 && (
             <div className="ml-4 text-xs text-muted-foreground">
-              {it.confidenceReasons[0]}
+              {it.confidenceReasons?.[0]}
             </div>
           )}
         </div>

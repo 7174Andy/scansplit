@@ -61,8 +61,8 @@ export interface ItemRecord {
   kind: "item" | "tax" | "tip" | "discount";
   position: number;
   assignedPersonIds: string[];
-  confidence: Confidence;
-  confidenceReasons: string[];
+  confidence?: Confidence;
+  confidenceReasons?: string[];
 }
 
 export interface FullTransaction {

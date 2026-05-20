@@ -35,27 +35,39 @@ fn mode_x_max(prices: &[&OcrLine]) -> Option<f32> {
     median(prices.iter().map(|l| l.bbox.x_max).collect())
 }
 
+fn tax_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"\b(TAX|GST|HST|VAT)\b").unwrap())
+}
+fn tip_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"\b(TIP|GRATUITY|SVC|SERVICE\s+CHG)\b").unwrap())
+}
+fn discount_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"\b(DISCOUNT|PROMO|COUPON|SAVINGS|OFF)\b").unwrap())
+}
+fn skip_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"\b(SUBTOTAL|NET\s+TOTAL|TOTAL|BALANCE|AMOUNT\s+DUE)\b").unwrap())
+}
+fn subtotal_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"\b(SUBTOTAL|NET\s+TOTAL)\b").unwrap())
+}
+fn total_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new(r"\b(TOTAL|BALANCE|AMOUNT\s+DUE)\b").unwrap())
+}
+
 fn classify_kind(text: &str, price_cents: i64) -> Option<&'static str> {
     let t = text.to_uppercase();
     // Skip totals entirely — `None` signals "drop this row"
-    if t.contains("SUBTOTAL") || t.contains("NET TOTAL") || t.contains("TOTAL") ||
-       t.contains("BALANCE") || t.contains("AMOUNT DUE") {
-        return None;
-    }
-    if t.contains("TAX") || t.contains("GST") || t.contains("HST") || t.contains("VAT") {
-        return Some("tax");
-    }
-    if t.contains("TIP") || t.contains("GRATUITY") || t.contains("SVC")
-        || t.contains("SERVICE CHG") {
-        return Some("tip");
-    }
-    if t.contains("DISCOUNT") || t.contains("PROMO") || t.contains("COUPON")
-        || t.contains("SAVINGS") || t.contains("OFF") {
-        return Some("discount");
-    }
-    if price_cents < 0 {
-        return Some("discount");
-    }
+    if skip_re().is_match(&t) { return None; }
+    if tax_re().is_match(&t) { return Some("tax"); }
+    if tip_re().is_match(&t) { return Some("tip"); }
+    if discount_re().is_match(&t) { return Some("discount"); }
+    if price_cents < 0 { return Some("discount"); }
     Some("item")
 }
 
@@ -170,8 +182,7 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
     let parsed_total_cents: Option<i64> = lines.iter()
         .filter(|l| {
             let t = l.text.to_uppercase();
-            !t.contains("SUBTOTAL") && !t.contains("NET TOTAL")
-                && (t.contains("TOTAL") || t.contains("BALANCE") || t.contains("AMOUNT DUE"))
+            !subtotal_re().is_match(&t) && total_re().is_match(&t)
         })
         .filter_map(|l| {
             // Find the priced satellite within window
@@ -454,6 +465,18 @@ mod tests {
         assert!(r.items.iter().any(|i| i.kind == "tip" && i.price_cents == 300));
         assert!(r.items.iter().any(|i| i.kind == "discount" && i.price_cents == -200));
         assert!(r.items.iter().all(|i| i.confidence == Confidence::High));
+    }
+
+    #[test]
+    fn classify_kind_does_not_misclassify_words_containing_keywords() {
+        // COFFEE contains "OFF" — must remain an item, not a discount
+        assert_eq!(classify_kind("COFFEE", 350), Some("item"));
+        // OFFICE CHAIR contains "OFF"
+        assert_eq!(classify_kind("OFFICE CHAIR", 9999), Some("item"));
+        // TANGO BLANCO TEQUILA doesn't contain a tax keyword as a whole word
+        assert_eq!(classify_kind("TANGO BLANCO TEQUILA", 4500), Some("item"));
+        // TULIP contains "TIP" as a substring but not a whole word
+        assert_eq!(classify_kind("TULIP BOUQUET", 2200), Some("item"));
     }
 
     #[test]

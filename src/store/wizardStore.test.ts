@@ -126,6 +126,26 @@ describe("wizardStore", () => {
     expect(item.confidenceReasons).toEqual(["needs review"]);
   });
 
+  it("loadFrom tolerates items without confidence fields (legacy saved transactions)", () => {
+    const s = useWizardStore.getState();
+    s.loadFrom({
+      transaction: { id: "t1", title: "Old split", currency: "USD", createdAt: 0, updatedAt: 0 },
+      receipts: [],
+      people: [],
+      items: [
+        {
+          id: "i1", transactionId: "t1", receiptId: null,
+          rawCode: null, name: "Legacy item", priceCents: 1000,
+          kind: "item", position: 0, assignedPersonIds: [],
+          // No confidence/confidenceReasons — simulating older saved data
+        } as any,
+      ],
+    });
+    // Should not throw on read
+    const item = useWizardStore.getState().items[0];
+    expect(item.name).toBe("Legacy item");
+  });
+
   it("replaceParsed drops existing items for that receipt and inserts new ones", () => {
     const s = useWizardStore.getState();
     s.addReceipt({ id: "r1", transactionId: "t", imagePath: "/x", position: 0, scannedAt: 0 });
