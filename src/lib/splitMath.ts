@@ -1,4 +1,5 @@
 import type { LineItem, Person, PersonTotal, SplitResult } from "./types";
+export type { SplitResult } from "./types";
 
 /**
  * Split `amountCents` among `sharerIds` using the largest-remainder method.
