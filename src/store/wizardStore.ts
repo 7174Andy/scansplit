@@ -29,6 +29,7 @@ interface WizardState {
   addReceipt: (r: ReceiptRecord) => void;
   setScanStatus: (id: string, status: WizardState["scanStatus"][string], err?: string) => void;
   mergeParsed: (receiptId: string, parsed: ParsedReceipt) => void;
+  replaceParsed: (receiptId: string, parsed: ParsedReceipt) => void;
   removeReceipt: (id: string) => void;
 
   setItem: (id: string, patch: Partial<ItemRecord>) => void;
@@ -134,6 +135,27 @@ export const useWizardStore = create<WizardState>()(
         };
       }),
 
+      replaceParsed: (receiptId, parsed) => set((st) => {
+        const otherItems = st.items.filter((i) => i.receiptId !== receiptId);
+        const newItems: ItemRecord[] = parsed.items.map((p, idx) => ({
+          id: newId(),
+          transactionId: st.transaction.id,
+          receiptId,
+          rawCode: p.raw,
+          name: p.name ?? p.raw,
+          priceCents: p.priceCents,
+          kind: p.kind,
+          position: otherItems.length + idx,
+          assignedPersonIds: [],
+          confidence: p.confidence ?? "high",
+          confidenceReasons: p.confidenceReasons ?? [],
+        }));
+        return {
+          items: [...otherItems, ...newItems],
+          detectedMerchant: parsed.merchant ?? st.detectedMerchant,
+        };
+      }),
+
       removeReceipt: (id) => set((st) => {
         const { [id]: _, ...remStatus } = st.scanStatus;
         const { [id]: __, ...remErrors } = st.scanErrors;
@@ -146,7 +168,19 @@ export const useWizardStore = create<WizardState>()(
       }),
 
       setItem: (id, patch) => set((st) => ({
-        items: st.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+        items: st.items.map((i) => {
+          if (i.id !== id) return i;
+          const updated = { ...i, ...patch };
+          // If the user edited a meaningful field, trust them: reset confidence.
+          const resetsConfidence =
+            ("name" in patch && patch.name !== i.name) ||
+            ("priceCents" in patch && patch.priceCents !== i.priceCents);
+          if (resetsConfidence) {
+            updated.confidence = "high";
+            updated.confidenceReasons = [];
+          }
+          return updated;
+        }),
       })),
 
       addItem: (it) => set((st) => ({ items: [...st.items, it] })),

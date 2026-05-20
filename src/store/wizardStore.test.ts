@@ -83,4 +83,78 @@ describe("wizardStore", () => {
     useWizardStore.getState().removePerson(alice.id);
     expect(useWizardStore.getState().items[0].assignedPersonIds).toEqual([bob.id]);
   });
+
+  it("setItem with a name change resets confidence to high and clears reasons", () => {
+    const s = useWizardStore.getState();
+    s.addItem({
+      id: "i1", transactionId: "t", name: "Late", priceCents: 500,
+      kind: "item", position: 0, assignedPersonIds: [],
+      confidence: "low", confidenceReasons: ["misread name"],
+    });
+    s.setItem("i1", { name: "Latte" });
+    const item = useWizardStore.getState().items[0];
+    expect(item.name).toBe("Latte");
+    expect(item.confidence).toBe("high");
+    expect(item.confidenceReasons).toEqual([]);
+  });
+
+  it("setItem with a price change resets confidence to high and clears reasons", () => {
+    const s = useWizardStore.getState();
+    s.addItem({
+      id: "i1", transactionId: "t", name: "Latte", priceCents: 0,
+      kind: "item", position: 0, assignedPersonIds: [],
+      confidence: "low", confidenceReasons: ["price missing"],
+    });
+    s.setItem("i1", { priceCents: 525 });
+    const item = useWizardStore.getState().items[0];
+    expect(item.priceCents).toBe(525);
+    expect(item.confidence).toBe("high");
+    expect(item.confidenceReasons).toEqual([]);
+  });
+
+  it("setItem with an unrelated patch (kind change) does NOT touch confidence", () => {
+    const s = useWizardStore.getState();
+    s.addItem({
+      id: "i1", transactionId: "t", name: "Tax", priceCents: 100,
+      kind: "item", position: 0, assignedPersonIds: [],
+      confidence: "medium", confidenceReasons: ["needs review"],
+    });
+    s.setItem("i1", { kind: "tax" });
+    const item = useWizardStore.getState().items[0];
+    expect(item.kind).toBe("tax");
+    expect(item.confidence).toBe("medium");
+    expect(item.confidenceReasons).toEqual(["needs review"]);
+  });
+
+  it("replaceParsed drops existing items for that receipt and inserts new ones", () => {
+    const s = useWizardStore.getState();
+    s.addReceipt({ id: "r1", transactionId: "t", imagePath: "/x", position: 0, scannedAt: 0 });
+    s.addReceipt({ id: "r2", transactionId: "t", imagePath: "/y", position: 1, scannedAt: 0 });
+    s.mergeParsed("r1", {
+      merchant: null,
+      totalsReconciled: true,
+      items: [
+        { raw: "Old", name: "Old", priceCents: 100, kind: "item", confidence: "low", confidenceReasons: ["x"] },
+      ],
+    });
+    s.mergeParsed("r2", {
+      merchant: null,
+      totalsReconciled: true,
+      items: [
+        { raw: "Keep", name: "Keep", priceCents: 200, kind: "item", confidence: "high", confidenceReasons: [] },
+      ],
+    });
+    s.replaceParsed("r1", {
+      merchant: null,
+      totalsReconciled: true,
+      items: [
+        { raw: "New", name: "New", priceCents: 500, kind: "item", confidence: "high", confidenceReasons: [] },
+      ],
+    });
+    const items = useWizardStore.getState().items;
+    // r1's Old is gone, replaced with New. r2's Keep is untouched.
+    expect(items.find((i) => i.name === "Old")).toBeUndefined();
+    expect(items.find((i) => i.name === "New")).toBeDefined();
+    expect(items.find((i) => i.name === "Keep")).toBeDefined();
+  });
 });
