@@ -36,7 +36,11 @@ async fn learned_expansion_fills_in_blank_name() {
         merchant: Some("Trader Joe's".into()),
         items: vec![ParsedItem {
             raw: "MISC".into(), name: None, price_cents: 499, kind: "item".into(),
+            confidence: scansplit_lib::ocr::Confidence::High,
+            confidence_reasons: vec![],
         }],
+        totals_reconciled: true,
+        parsed_total_cents: None,
     };
     code_expansions::apply_learned(&pool, &mut r).await.unwrap();
     assert_eq!(r.items[0].name.as_deref(), Some("Generic Snack"));
@@ -50,7 +54,13 @@ async fn store_specific_overrides_generic() {
 
     let mut r = ParsedReceipt {
         merchant: Some("Walmart".into()),
-        items: vec![ParsedItem { raw: "GV".into(), name: None, price_cents: 100, kind: "item".into() }],
+        items: vec![ParsedItem {
+            raw: "GV".into(), name: None, price_cents: 100, kind: "item".into(),
+            confidence: scansplit_lib::ocr::Confidence::High,
+            confidence_reasons: vec![],
+        }],
+        totals_reconciled: true,
+        parsed_total_cents: None,
     };
     code_expansions::apply_learned(&pool, &mut r).await.unwrap();
     assert_eq!(r.items[0].name.as_deref(), Some("Great Value"));
