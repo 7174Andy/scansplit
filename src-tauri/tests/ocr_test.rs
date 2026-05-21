@@ -1,6 +1,6 @@
 use scansplit_lib::ocr::claude::parse_response_text;
 use scansplit_lib::ocr::code_expansions;
-use scansplit_lib::ocr::{Confidence, ParsedItem, ParsedReceipt};
+use scansplit_lib::ocr::{ParsedItem, ParsedReceipt};
 use sqlx::sqlite::SqlitePoolOptions;
 
 #[test]
@@ -36,11 +36,7 @@ async fn learned_expansion_fills_in_blank_name() {
         merchant: Some("Trader Joe's".into()),
         items: vec![ParsedItem {
             raw: "MISC".into(), name: None, price_cents: 499, kind: "item".into(),
-            confidence: Confidence::High,
-            confidence_reasons: vec![],
         }],
-        totals_reconciled: true,
-        parsed_total_cents: None,
     };
     code_expansions::apply_learned(&pool, &mut r).await.unwrap();
     assert_eq!(r.items[0].name.as_deref(), Some("Generic Snack"));
@@ -56,11 +52,7 @@ async fn store_specific_overrides_generic() {
         merchant: Some("Walmart".into()),
         items: vec![ParsedItem {
             raw: "GV".into(), name: None, price_cents: 100, kind: "item".into(),
-            confidence: Confidence::High,
-            confidence_reasons: vec![],
         }],
-        totals_reconciled: true,
-        parsed_total_cents: None,
     };
     code_expansions::apply_learned(&pool, &mut r).await.unwrap();
     assert_eq!(r.items[0].name.as_deref(), Some("Great Value"));
