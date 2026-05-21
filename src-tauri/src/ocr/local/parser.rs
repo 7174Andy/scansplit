@@ -119,7 +119,12 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
                 .collect::<Vec<_>>()
                 .join(" ");
             let combined = format!("{} {}", l.text, satellite_text);
-            if skip_re().is_match(&combined.to_uppercase()) {
+            // Cutoff fires only on grand-total rows (TOTAL/BALANCE/AMOUNT DUE).
+            // SUBTOTAL and NET TOTAL appear mid-receipt and must NOT trigger the
+            // cutoff — otherwise rows like TAX (which often follows Net total)
+            // get dropped.
+            let combined_u = combined.to_uppercase();
+            if total_re().is_match(&combined_u) && !subtotal_re().is_match(&combined_u) {
                 candidates.push(l.bbox.y_min);
             }
         }
@@ -136,12 +141,21 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
         };
         if !in_price_col(l) { continue; }
 
+        // Prefer the satellite *closest* in y to the price line — that's
+        // visually paired with it on the receipt. Fall back to longest text
+        // on ties (e.g. when two satellites share the same row as the price).
         let name_candidate = lines.iter().enumerate()
             .filter(|(j, ll)| *j != i
                 && (ll.bbox.y_min - l.bbox.y_min).abs() <= window
                 && !in_price_col(ll)
                 && extract_price_cents(&ll.text).is_none())
-            .max_by_key(|(_, ll)| ll.text.len())
+            .min_by(|(_, a), (_, b)| {
+                let da = (a.bbox.y_min - l.bbox.y_min).abs();
+                let db = (b.bbox.y_min - l.bbox.y_min).abs();
+                da.partial_cmp(&db)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| b.text.len().cmp(&a.text.len()))
+            })
             .map(|(_, ll)| ll.text.clone());
 
         // Suppression: if the satellite text starts with '(' AND the price text ends with ')',
@@ -568,6 +582,32 @@ mod tests {
             r.items.iter().map(|i| (i.name.clone(), i.price_cents, i.kind.clone())).collect::<Vec<_>>());
         assert!(r.items.iter().any(|i| i.kind == "item" && i.price_cents == 1000));
         assert!(r.items.iter().any(|i| i.kind == "tax" && i.price_cents == 100));
+    }
+
+    #[test]
+    fn net_total_does_not_trigger_footer_cutoff() {
+        // Real-world IKEA ordering: Net total → TAX → Total → footer.
+        // The footer cutoff must fire at TOTAL (not Net total), so TAX
+        // sandwiched between them stays in the items.
+        let lines = vec![
+            line("Burger",     0.10, 0.30, 0.40),
+            line("10.00",      0.85, 0.30, 0.95),
+            line("Net total",  0.10, 0.50, 0.30),
+            line("10.00",      0.85, 0.50, 0.95),
+            line("TAX",        0.10, 0.60, 0.20),
+            line("1.00",       0.85, 0.60, 0.95),
+            line("TOTAL",      0.10, 0.70, 0.30),
+            line("11.00",      0.85, 0.70, 0.95),
+            line("Payment",    0.10, 0.80, 0.40),
+            line("USD$11.00",  0.10, 0.80, 0.95),
+        ];
+        let r = parse(lines);
+        assert!(r.items.iter().any(|i| i.kind == "tax" && i.price_cents == 100),
+            "TAX row must survive when Net total appears before it; got: {:?}",
+            r.items.iter().map(|i| (i.name.clone(), i.price_cents, i.kind.clone())).collect::<Vec<_>>());
+        // No payment row leaks through.
+        assert!(!r.items.iter().any(|i| i.price_cents == 1100 && i.kind == "item"),
+            "USD$11.00 payment row must be dropped (below TOTAL)");
     }
 
     #[test]
