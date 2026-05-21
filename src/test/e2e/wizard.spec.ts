@@ -79,10 +79,10 @@ test("subset assignment: one person excluded from an item", async ({ page }) => 
   await page.getByRole("button", { name: "Add" }).click();
   await page.getByRole("button", { name: "Next" }).click();
 
-  // Step 4: assignment starts empty (= everyone). Click Alice and Bob to make
-  // the assignment explicit [Alice, Bob]; Cara is now excluded.
-  await page.getByText("Alice", { exact: true }).first().click();
-  await page.getByText("Bob", { exact: true }).first().click();
+  // Step 4: assignment starts empty (= everyone, with all chips active).
+  // Clicking an active chip deselects that person — click Cara to exclude her.
+  // Resulting assignment: [Alice, Bob].
+  await page.getByText("Cara", { exact: true }).first().click();
 
   await page.getByRole("button", { name: "Next" }).click();
 
