@@ -60,6 +60,13 @@ fn total_re() -> &'static Regex {
     R.get_or_init(|| Regex::new(r"\b(TOTAL|BALANCE|AMOUNT\s+DUE)\b").unwrap())
 }
 
+fn is_decorative(text: &str) -> bool {
+    let t = text.trim();
+    !t.is_empty()
+        && t.len() >= 4
+        && t.chars().all(|c| matches!(c, '*' | '-' | '_' | '=' | '~'))
+}
+
 fn classify_kind(text: &str, price_cents: i64) -> Option<&'static str> {
     let t = text.to_uppercase();
     // Skip totals entirely — `None` signals "drop this row"
@@ -83,6 +90,10 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
 
     lines.sort_by(|a, b| a.bbox.y_min.partial_cmp(&b.bbox.y_min).unwrap_or(std::cmp::Ordering::Equal));
 
+    // Drop decorative separator lines (rows of *, -, =, etc.) so they can never
+    // be selected as item name candidates.
+    lines.retain(|l| !is_decorative(&l.text));
+
     let priced: Vec<&OcrLine> = lines.iter().filter(|l| extract_price_cents(&l.text).is_some()).collect();
     let price_col = mode_x_max(&priced).unwrap_or(1.0);
     let line_height = median(lines.iter().map(|l| l.bbox.height()).collect()).unwrap_or(0.013);
@@ -92,7 +103,33 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
     let mut items: Vec<ParsedItem> = Vec::new();
     let window = 2.0 * line_height;
 
+    // Cut-off: anything below the printed TOTAL is footer (payment method,
+    // transaction record, etc.) and must not become an item.
+    let footer_cutoff_y: Option<f32> = {
+        let mut candidates: Vec<f32> = Vec::new();
+        for (i, l) in lines.iter().enumerate() {
+            if extract_price_cents(&l.text).is_none() { continue; }
+            if !in_price_col(l) { continue; }
+            let satellite_text: String = lines.iter().enumerate()
+                .filter(|(j, ll)| *j != i
+                    && (ll.bbox.y_min - l.bbox.y_min).abs() <= window
+                    && !in_price_col(ll)
+                    && extract_price_cents(&ll.text).is_none())
+                .map(|(_, ll)| ll.text.as_str())
+                .collect::<Vec<_>>()
+                .join(" ");
+            let combined = format!("{} {}", l.text, satellite_text);
+            if skip_re().is_match(&combined.to_uppercase()) {
+                candidates.push(l.bbox.y_min);
+            }
+        }
+        candidates.into_iter().reduce(f32::min)
+    };
+
     for (i, l) in lines.iter().enumerate() {
+        if let Some(cut) = footer_cutoff_y {
+            if l.bbox.y_min > cut { continue; }
+        }
         let price_cents = match extract_price_cents(&l.text) {
             Some(p) => p,
             None => continue,
@@ -148,6 +185,9 @@ pub fn parse(mut lines: Vec<OcrLine>) -> ParsedReceipt {
     // priced satellite within ±(2 * line_height) becomes a Low-confidence item.
     let article_re = article_regex();
     for (i, l) in lines.iter().enumerate() {
+        if let Some(cut) = footer_cutoff_y {
+            if l.bbox.y_min > cut { continue; }
+        }
         if !article_re.is_match(l.text.trim()) { continue; }
 
         let has_priced_satellite = lines.iter().enumerate().any(|(j, ll)| {
@@ -477,6 +517,57 @@ mod tests {
         assert_eq!(classify_kind("TANGO BLANCO TEQUILA", 4500), Some("item"));
         // TULIP contains "TIP" as a substring but not a whole word
         assert_eq!(classify_kind("TULIP BOUQUET", 2200), Some("item"));
+    }
+
+    #[test]
+    fn asterisk_separator_is_not_used_as_item_name() {
+        // The asterisk line is at y_min=0.305, within ±2×line_height (0.026) of both
+        // priced rows (0.30 and 0.36). Its 40-char text beats "Burger" (6) and "Salad"
+        // (5) in the max_by_key(text.len()) sweep, so without the decorative filter it
+        // becomes the name for both items.
+        let lines = vec![
+            line("Burger",                                  0.10, 0.30,  0.40),
+            line("10.00",                                   0.85, 0.30,  0.95),
+            line("****************************************", 0.10, 0.305, 0.65),
+            line("Salad",                                   0.10, 0.36,  0.40),
+            line("8.00",                                    0.85, 0.36,  0.95),
+        ];
+        let r = parse(lines);
+        // Both items present with the correct names — no asterisk name on either.
+        let names: Vec<String> = r.items.iter().filter_map(|i| i.name.clone()).collect();
+        for n in &names {
+            assert!(!n.contains("*"), "name should not contain asterisks: {n:?}");
+        }
+        assert!(names.iter().any(|n| n == "Burger"), "Burger missing from {:?}", names);
+        assert!(names.iter().any(|n| n == "Salad"), "Salad missing from {:?}", names);
+    }
+
+    #[test]
+    fn rows_below_total_are_not_emitted_as_items() {
+        // USD$11.00 is in the price column (x_max=0.95) and is below TOTAL.
+        // Without the footer cutoff it gets emitted as an extra item.
+        // "#1234" is also in the price column and below TOTAL.
+        let lines = vec![
+            line("Burger",         0.10, 0.30, 0.40),
+            line("10.00",          0.85, 0.30, 0.95),
+            line("TAX",            0.10, 0.50, 0.20),
+            line("1.00",           0.85, 0.50, 0.95),
+            line("TOTAL",          0.10, 0.70, 0.30),
+            line("11.00",          0.85, 0.70, 0.95),
+            // Footer rows — all below TOTAL, should be dropped
+            line("EFT Debit Card", 0.10, 0.80, 0.40),
+            line("USD$11.00",      0.10, 0.80, 0.95), // in price col, below TOTAL
+            line("Total Articles", 0.10, 0.85, 0.40),
+            line("1",              0.85, 0.85, 0.95),
+            line("TRANSACTION",    0.10, 0.90, 0.40),
+            line("#1234",          0.85, 0.90, 0.95),
+        ];
+        let r = parse(lines);
+        // Only Burger + Tax — no EFT, Total Articles, or TRANSACTION rows.
+        assert_eq!(r.items.len(), 2, "expected only Burger and TAX, got: {:?}",
+            r.items.iter().map(|i| (i.name.clone(), i.price_cents, i.kind.clone())).collect::<Vec<_>>());
+        assert!(r.items.iter().any(|i| i.kind == "item" && i.price_cents == 1000));
+        assert!(r.items.iter().any(|i| i.kind == "tax" && i.price_cents == 100));
     }
 
     #[test]
