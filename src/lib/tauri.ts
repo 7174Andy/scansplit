@@ -15,7 +15,6 @@ interface TauriApi {
   setApiKey: (key: string) => Promise<void>;
   deleteApiKey: () => Promise<void>;
   scanReceipt: (sourcePath: string) => Promise<ScanResult>;
-  scanReceiptWithClaude: (sourcePath: string) => Promise<ScanResult>;
   recordCodeCorrections: (
     merchant: string | null,
     corrections: Array<[string, string]>
@@ -32,7 +31,6 @@ const realApi: TauriApi = {
   setApiKey: (key) => invoke<void>("set_api_key", { key }),
   deleteApiKey: () => invoke<void>("delete_api_key"),
   scanReceipt: (sourcePath) => invoke<ScanResult>("scan_receipt", { sourcePath }),
-  scanReceiptWithClaude: (sourcePath) => invoke<ScanResult>("scan_receipt_with_claude", { sourcePath }),
   recordCodeCorrections: (merchant, corrections) =>
     invoke<void>("record_code_corrections", { merchant, corrections }),
 };
@@ -54,10 +52,6 @@ const stubApi: TauriApi = {
   scanReceipt: async () => {
     throw new Error("scan_receipt is not available in test mode; use the window seed hook");
   },
-  scanReceiptWithClaude: async (_sourcePath: string): Promise<ScanResult> => ({
-    imagePath: "/test/seed.jpg",
-    parsed: { merchant: null, items: [], totalsReconciled: true },
-  }),
   recordCodeCorrections: async () => {},
 };
 

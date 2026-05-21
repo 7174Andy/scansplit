@@ -113,48 +113,6 @@ test("empty OCR: user adds items by hand", async ({ page }) => {
   await expect(page.getByText(/\$10\.00/).first()).toBeVisible();
 });
 
-test("low-confidence items show red dot and reason text", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "New Split" }).click();
-  await page.evaluate(() => {
-    (window as any).__scansplit_seed_low_confidence__("r-lc-1", {
-      merchant: "Cafe",
-      totalsReconciled: false,
-      items: [
-        {
-          raw: "Latte", name: "Latte", priceCents: 0, kind: "item",
-          confidence: "low", confidenceReasons: ["price missing"],
-        },
-      ],
-    });
-  });
-  await page.getByRole("button", { name: "Next" }).click();
-  // Red dot present (ConfidenceDot for "low" uses bg-rose-500)
-  await expect(page.locator(".bg-rose-500").first()).toBeVisible();
-  // Reason line present
-  await expect(page.getByText("price missing").first()).toBeVisible();
-});
-
-test("rescan-with-Claude button appears when key is set and items need review", async ({ page }) => {
-  // In test mode, stubApi.getApiKey always returns "test-key" so hasApiKey is true.
-  await page.goto("/");
-  await page.getByRole("button", { name: "New Split" }).click();
-  await page.evaluate(() => {
-    (window as any).__scansplit_seed_low_confidence__("r-lc-2", {
-      merchant: "X",
-      totalsReconciled: false,
-      items: [
-        {
-          raw: "Latte", name: "Latte", priceCents: 0, kind: "item",
-          confidence: "low", confidenceReasons: ["price missing"],
-        },
-      ],
-    });
-  });
-  // The button is rendered in Step 1 once status is "ok" and hasApiKey + needsReview
-  await expect(page.getByRole("button", { name: "Rescan with Claude" })).toBeVisible();
-});
-
 test("OCR retry: failed scan can be retried", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "New Split" }).click();

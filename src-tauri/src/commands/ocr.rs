@@ -3,38 +3,19 @@ use crate::ocr::claude::ClaudeScanner;
 use crate::ocr::code_expansions;
 use crate::ocr::{ParsedReceipt, Scanner};
 use crate::AppState;
-use std::sync::Arc;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
-#[cfg(target_os = "macos")]
-fn build_local_scanner(_app: &AppHandle) -> AppResult<Box<dyn Scanner>> {
-    use crate::ocr::local::{apple::AppleOcr, LocalScanner};
-    Ok(Box::new(LocalScanner::new(Arc::new(AppleOcr::new()))))
-}
-
-#[cfg(not(target_os = "macos"))]
-fn build_local_scanner(app: &AppHandle) -> AppResult<Box<dyn Scanner>> {
-    use crate::ocr::local::{tesseract::TesseractOcr, LocalScanner};
-    let resource_dir = app
-        .path()
-        .resource_dir()
-        .map_err(|e| AppError::Other(format!("resource dir: {e}")))?;
-    let tessdata = resource_dir
-        .join("tessdata")
-        .to_string_lossy()
-        .into_owned();
-    Ok(Box::new(LocalScanner::new(Arc::new(TesseractOcr::new(
-        tessdata,
-    )))))
-}
-
-async fn run_scan(
+#[tauri::command]
+pub async fn scan_receipt(
     app: AppHandle,
     state: State<'_, AppState>,
     source_path: String,
-    scanner: Box<dyn Scanner>,
 ) -> AppResult<ScanResult> {
+    let key = crate::commands::settings::read_api_key()?
+        .ok_or(AppError::MissingApiKey)?;
+    let scanner: Box<dyn Scanner> = Box::new(ClaudeScanner::new(key));
+
     let bytes = std::fs::read(&source_path)?;
 
     let app_dir = app
@@ -57,28 +38,6 @@ async fn run_scan(
         image_path: stored.display().to_string(),
         parsed,
     })
-}
-
-#[tauri::command]
-pub async fn scan_receipt(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    source_path: String,
-) -> AppResult<ScanResult> {
-    let scanner = build_local_scanner(&app)?;
-    run_scan(app, state, source_path, scanner).await
-}
-
-#[tauri::command]
-pub async fn scan_receipt_with_claude(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    source_path: String,
-) -> AppResult<ScanResult> {
-    let key = crate::commands::settings::read_api_key()?
-        .ok_or(AppError::MissingApiKey)?;
-    let scanner: Box<dyn Scanner> = Box::new(ClaudeScanner::new(key));
-    run_scan(app, state, source_path, scanner).await
 }
 
 #[derive(serde::Serialize)]
