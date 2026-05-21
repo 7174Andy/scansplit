@@ -4,6 +4,7 @@ import { useWizardStore } from "../../store/wizardStore";
 import { ReceiptThumbnail } from "../../components/ReceiptThumbnail";
 import { ScanErrorDialog } from "../../components/ScanErrorDialog";
 import { api } from "../../lib/tauri";
+import type { ParsedReceipt } from "../../lib/types";
 import { Plus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -13,12 +14,19 @@ function newId(): string {
 
 export function Step1Scan({ onNext }: { onNext: () => void }) {
   const {
-    transaction, receipts, scanStatus, scanErrors,
-    addReceipt, setScanStatus, mergeParsed, removeReceipt,
+    transaction, receipts, scanStatus, scanErrors, items,
+    addReceipt, setScanStatus, mergeParsed, replaceParsed, removeReceipt,
   } = useWizardStore();
 
   const [picking, setPicking] = useState(false);
   const [errorDialog, setErrorDialog] = useState<{ receiptId: string } | null>(null);
+  const [elapsed, setElapsed] = useState<Record<string, number>>({});
+  const [hasApiKey, setHasApiKey] = useState(false);
+
+  // Check for API key on mount
+  useEffect(() => {
+    api.getApiKey().then((key) => setHasApiKey(!!key)).catch(() => setHasApiKey(false));
+  }, []);
 
   // Track which receipts we've already auto-opened a dialog for.
   // When a receipt newly enters the error state (not previously errored), auto-open.
@@ -62,7 +70,9 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
   async function scanOne(id: string, sourcePath: string) {
     setScanStatus(id, "scanning");
     try {
+      const started = performance.now();
       const result = await api.scanReceipt(sourcePath);
+      const elapsedMs = Math.round(performance.now() - started);
       useWizardStore.setState((st) => ({
         receipts: st.receipts.map((r) =>
           r.id === id ? { ...r, imagePath: result.imagePath } : r
@@ -70,9 +80,30 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
       }));
       mergeParsed(id, result.parsed);
       setScanStatus(id, "ok");
+      setElapsed((m) => ({ ...m, [id]: elapsedMs }));
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       setScanStatus(id, "error", msg);
+    }
+  }
+
+  function needsReview(receiptId: string): boolean {
+    const ri = items.filter((i) => i.receiptId === receiptId);
+    return ri.some((i) => i.confidence !== "high");
+  }
+
+  async function rescanWithClaude(receiptId: string) {
+    const r = receipts.find((x) => x.id === receiptId);
+    if (!r) return;
+    setScanStatus(receiptId, "scanning");
+    try {
+      const started = performance.now();
+      const result = await api.scanReceiptWithClaude(r.imagePath);
+      replaceParsed(receiptId, result.parsed);
+      setElapsed((m) => ({ ...m, [receiptId]: Math.round(performance.now() - started) }));
+      setScanStatus(receiptId, "ok");
+    } catch (err: any) {
+      setScanStatus(receiptId, "error", String(err));
     }
   }
 
@@ -101,7 +132,24 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
         position: receipts.length, scannedAt: 0,
       });
       setScanStatus(receiptId, "ok");
-      mergeParsed(receiptId, { merchant: null, items: [] });
+      mergeParsed(receiptId, { merchant: null, items: [], totalsReconciled: true });
+    };
+    (window as any).__scansplit_seed_low_confidence__ = (receiptId: string, parsed: ParsedReceipt) => {
+      const stamped: ParsedReceipt = {
+        ...parsed,
+        items: parsed.items.map((it) => ({
+          ...it,
+          confidence: "low" as const,
+          confidenceReasons: it.confidenceReasons?.length ? it.confidenceReasons : ["needs review"],
+        })),
+        totalsReconciled: false,
+      };
+      addReceipt({
+        id: receiptId, transactionId: transaction.id, imagePath: "/test/seed.jpg",
+        position: receipts.length, scannedAt: 0,
+      });
+      useWizardStore.getState().mergeParsed(receiptId, stamped);
+      useWizardStore.getState().setScanStatus(receiptId, "ok");
     };
   }
 
@@ -120,13 +168,24 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
       </Button>
       <div className="mt-4 flex flex-wrap gap-2">
         {receipts.map((r) => (
-          <ReceiptThumbnail
-            key={r.id}
-            receipt={r}
-            status={scanStatus[r.id] ?? "pending"}
-            onRemove={() => removeReceipt(r.id)}
-            onErrorClick={() => setErrorDialog({ receiptId: r.id })}
-          />
+          <div key={r.id} className="flex flex-col gap-1">
+            <ReceiptThumbnail
+              receipt={r}
+              status={scanStatus[r.id] ?? "pending"}
+              onRemove={() => removeReceipt(r.id)}
+              onErrorClick={() => setErrorDialog({ receiptId: r.id })}
+            />
+            {scanStatus[r.id] === "ok" && elapsed[r.id] !== undefined && (
+              <div className="text-xs text-muted-foreground">
+                ✓ Scanned in {(elapsed[r.id] / 1000).toFixed(1)} s
+              </div>
+            )}
+            {scanStatus[r.id] === "ok" && hasApiKey && needsReview(r.id) && (
+              <Button variant="outline" size="sm" onClick={() => rescanWithClaude(r.id)}>
+                Rescan with Claude
+              </Button>
+            )}
+          </div>
         ))}
       </div>
       <div className="mt-6">

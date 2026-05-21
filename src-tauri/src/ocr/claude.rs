@@ -1,19 +1,21 @@
 use crate::error::{AppError, AppResult};
-use crate::ocr::{LlmClient, ParsedReceipt};
+use crate::ocr::{Scanner, ParsedReceipt};
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::Deserialize;
 use serde_json::json;
 
-pub struct ClaudeClient {
+pub struct ClaudeScanner {
     http: reqwest::Client,
     model: String,
+    api_key: String,
 }
 
-impl ClaudeClient {
-    pub fn new() -> Self {
+impl ClaudeScanner {
+    pub fn new(api_key: String) -> Self {
         Self {
             http: reqwest::Client::new(),
             model: "claude-sonnet-4-6".to_string(),
+            api_key,
         }
     }
 }
@@ -53,8 +55,8 @@ struct AnthropicBlock {
 }
 
 #[async_trait::async_trait]
-impl LlmClient for ClaudeClient {
-    async fn scan(&self, image_bytes: &[u8], api_key: &str) -> AppResult<ParsedReceipt> {
+impl Scanner for ClaudeScanner {
+    async fn scan(&self, image_bytes: &[u8]) -> AppResult<ParsedReceipt> {
         let (prepared, media_type) = prepare_image(image_bytes)?;
         let b64 = B64.encode(&prepared);
         let body = json!({
@@ -71,7 +73,7 @@ impl LlmClient for ClaudeClient {
 
         let res = self.http
             .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", api_key)
+            .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .header("content-type", "application/json")
             .json(&body)

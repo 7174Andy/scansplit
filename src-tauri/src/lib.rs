@@ -35,6 +35,7 @@ pub fn run() {
             commands::settings::set_api_key,
             commands::settings::delete_api_key,
             commands::ocr::scan_receipt,
+            commands::ocr::scan_receipt_with_claude,
             commands::ocr::record_code_corrections,
         ])
         .run(tauri::generate_context!())
