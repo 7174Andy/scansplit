@@ -44,7 +44,7 @@ describe("computeSplit — subset assignment", () => {
   });
 });
 
-describe("computeSplit — proportional tax & tip", () => {
+describe("computeSplit — proportional tax, even-split tip", () => {
   it("allocates tax proportionally to each person's item subtotal", () => {
     const ps = people("A", "B");
     const result = computeSplit(
@@ -60,7 +60,7 @@ describe("computeSplit — proportional tax & tip", () => {
     expect(result.totalCents).toBe(3300);
   });
 
-  it("allocates tip the same way as tax", () => {
+  it("splits tip evenly across all people regardless of item subtotal", () => {
     const ps = people("A", "B");
     const result = computeSplit(
       [
@@ -70,8 +70,29 @@ describe("computeSplit — proportional tax & tip", () => {
       ],
       ps
     );
-    expect(result.perPerson[0].totalCents).toBe(2400);
-    expect(result.perPerson[1].totalCents).toBe(1200);
+    // 600 / 2 = 300 each, exact. A and B each pay half the tip even though
+    // A ordered twice as much.
+    expect(result.perPerson[0].totalCents).toBe(2300);
+    expect(result.perPerson[1].totalCents).toBe(1300);
+    expect(result.totalCents).toBe(3600);
+  });
+
+  it("routes the odd tip cent to the person furthest behind", () => {
+    // Three people, one with no items. Tip of 7¢ → base 2, remainder 1.
+    // Cumulative-min sends the +1 to C, who's at 0 after items.
+    const ps = people("A", "B", "C");
+    const result = computeSplit(
+      [
+        { ...item({ id: "i1", priceCents: 500 }), assignedPersonIds: ["p0"] },
+        { ...item({ id: "i2", priceCents: 500 }), assignedPersonIds: ["p1"] },
+        item({ id: "tip", priceCents: 7, kind: "tip" }),
+      ],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(502); // A: 500 + 2
+    expect(result.perPerson[1].totalCents).toBe(502); // B: 500 + 2
+    expect(result.perPerson[2].totalCents).toBe(3);   // C: 0 + 3
+    expect(result.totalCents).toBe(1007);
   });
 });
 

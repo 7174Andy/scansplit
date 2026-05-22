@@ -116,14 +116,20 @@ export function computeSplit(
     Array.from(totals.values()).map((t) => [t.personId, t.totalCents])
   );
 
-  // Pass 2: tax / tip / discount, proportional to person subtotal.
+  // Pass 2: tax and discount stay proportional to item subtotal; tip splits
+  // evenly across everyone in the transaction.
+  const allIds = people.map((p) => p.id);
   for (const it of items) {
     if (it.kind === "item") continue;
-    const shares = allocateProportional(it.priceCents, subtotalByPerson);
+    const shares =
+      it.kind === "tip"
+        ? allocate(it.priceCents, allIds, running)
+        : allocateProportional(it.priceCents, subtotalByPerson);
     for (const [pid, share] of shares) {
       const t = totals.get(pid)!;
       t.totalCents += share;
       t.itemBreakdown.push({ itemId: it.id, shareCents: share });
+      running.set(pid, running.get(pid)! + share);
     }
   }
 
