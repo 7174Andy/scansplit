@@ -37,10 +37,10 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
 
     for p in &full.people {
         sqlx::query(
-            "INSERT INTO transaction_people (id, transaction_id, name, position)
-             VALUES (?, ?, ?, ?)",
+            "INSERT INTO transaction_people (id, transaction_id, name, position, paid_at)
+             VALUES (?, ?, ?, ?, ?)",
         )
-        .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position)
+        .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position).bind(p.paid_at)
         .execute(&mut *tx).await?;
     }
 
@@ -151,8 +151,8 @@ pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResul
 
     let mut tx2 = pool.begin().await?;
     for p in &full.people {
-        sqlx::query("INSERT INTO transaction_people (id, transaction_id, name, position) VALUES (?, ?, ?, ?)")
-            .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position)
+        sqlx::query("INSERT INTO transaction_people (id, transaction_id, name, position, paid_at) VALUES (?, ?, ?, ?, ?)")
+            .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position).bind(p.paid_at)
             .execute(&mut *tx2).await?;
     }
     for (i, r) in full.receipts.iter().enumerate() {
@@ -196,7 +196,7 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
     };
 
     let people: Vec<Person> = sqlx::query(
-        "SELECT id, transaction_id, name, position FROM transaction_people
+        "SELECT id, transaction_id, name, position, paid_at FROM transaction_people
          WHERE transaction_id = ? ORDER BY position",
     )
     .bind(id)
@@ -205,6 +205,7 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
     .map(|r| Person {
         id: r.get("id"), transaction_id: r.get("transaction_id"),
         name: r.get("name"), position: r.get("position"),
+        paid_at: r.get("paid_at"),
     })
     .collect();
 
@@ -259,14 +260,26 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
 }
 
 pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSummary>> {
+    // Aggregate people and items in independent subqueries so the joins
+    // don't multiply each other (people_count × items_count rows).
     let rows = sqlx::query(
         "SELECT t.id, t.title, t.currency, t.updated_at,
-                COUNT(DISTINCT tp.id) AS people_count,
-                COALESCE(SUM(i.price_cents), 0) AS total_cents
+                COALESCE(p.people_count, 0) AS people_count,
+                COALESCE(p.paid_count, 0)   AS paid_count,
+                COALESCE(i.total_cents, 0)  AS total_cents
          FROM transactions t
-         LEFT JOIN transaction_people tp ON tp.transaction_id = t.id
-         LEFT JOIN items i ON i.transaction_id = t.id
-         GROUP BY t.id
+         LEFT JOIN (
+             SELECT transaction_id,
+                    COUNT(*) AS people_count,
+                    SUM(CASE WHEN paid_at IS NOT NULL THEN 1 ELSE 0 END) AS paid_count
+             FROM transaction_people
+             GROUP BY transaction_id
+         ) p ON p.transaction_id = t.id
+         LEFT JOIN (
+             SELECT transaction_id, SUM(price_cents) AS total_cents
+             FROM items
+             GROUP BY transaction_id
+         ) i ON i.transaction_id = t.id
          ORDER BY t.updated_at DESC",
     )
     .fetch_all(pool).await?;
@@ -276,6 +289,7 @@ pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSumma
         currency: r.get("currency"),
         updated_at: r.get("updated_at"),
         people_count: r.get("people_count"),
+        paid_count: r.get("paid_count"),
         total_cents: r.get("total_cents"),
     }).collect())
 }
@@ -288,6 +302,7 @@ pub struct TransactionSummary {
     pub currency: String,
     pub updated_at: i64,
     pub people_count: i64,
+    pub paid_count: i64,
     pub total_cents: i64,
 }
 
@@ -301,4 +316,39 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<Vec<String>> {
     sqlx::query("DELETE FROM transactions WHERE id = ?")
         .bind(id).execute(pool).await?;
     Ok(paths)
+}
+
+pub async fn set_person_paid(
+    pool: &SqlitePool,
+    person_id: &str,
+    paid: bool,
+) -> AppResult<()> {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let new_paid_at: Option<i64> = if paid { Some(now_ms) } else { None };
+
+    let mut tx = pool.begin().await?;
+
+    let result = sqlx::query(
+        "UPDATE transaction_people SET paid_at = ? WHERE id = ?",
+    )
+    .bind(new_paid_at)
+    .bind(person_id)
+    .execute(&mut *tx)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(crate::error::AppError::NotFound);
+    }
+
+    sqlx::query(
+        "UPDATE transactions SET updated_at = ?
+         WHERE id = (SELECT transaction_id FROM transaction_people WHERE id = ?)",
+    )
+    .bind(now_ms)
+    .bind(person_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(())
 }

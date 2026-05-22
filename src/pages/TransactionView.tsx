@@ -37,11 +37,31 @@ export default function TransactionView() {
     );
   }, [full]);
 
-  if (err) return <div className="p-6 text-destructive">Error: {err}</div>;
+  if (err && !full) return <div className="p-6 text-destructive">Error: {err}</div>;
   if (!full || !split) return <div className="p-6 text-muted-foreground">Loading…</div>;
 
   const personNames = Object.fromEntries(full.people.map((p) => [p.id, p.name]));
   const itemNames = Object.fromEntries(full.items.map((i) => [i.id, i.name]));
+  const paidByPersonId = Object.fromEntries(full.people.map((p) => [p.id, p.paidAt]));
+
+  async function togglePaid(personId: string, nextPaid: boolean) {
+    if (!full) return;
+    const prev = full;
+    const optimistic: FullTransaction = {
+      ...full,
+      people: full.people.map((p) =>
+        p.id === personId ? { ...p, paidAt: nextPaid ? Date.now() : null } : p
+      ),
+    };
+    setFull(optimistic);
+    setErr(null);
+    try {
+      await api.setPersonPaid(personId, nextPaid);
+    } catch (e: any) {
+      setFull(prev);
+      setErr(String(e?.message ?? e));
+    }
+  }
 
   async function copy() {
     if (!full || !split) return;
@@ -103,11 +123,14 @@ export default function TransactionView() {
           <Trash2 className="size-4" /> Delete
         </Button>
       </div>
+      {err && <p className="mb-2 text-destructive">{err}</p>}
       <SplitTotalsTable
         split={split}
         personNames={personNames}
         itemNames={itemNames}
         currency={full.transaction.currency}
+        paidByPersonId={paidByPersonId}
+        onTogglePaid={togglePaid}
       />
 
       <ReceiptViewerDialog

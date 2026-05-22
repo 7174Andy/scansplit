@@ -24,8 +24,8 @@ fn sample_full(id: &str) -> FullTransaction {
             updated_at: 1,
         },
         people: vec![
-            Person { id: "p1".into(), transaction_id: id.into(), name: "Alice".into(), position: 0 },
-            Person { id: "p2".into(), transaction_id: id.into(), name: "Bob".into(), position: 1 },
+            Person { id: "p1".into(), transaction_id: id.into(), name: "Alice".into(), position: 0, paid_at: None },
+            Person { id: "p2".into(), transaction_id: id.into(), name: "Bob".into(), position: 1, paid_at: None },
         ],
         receipts: vec![Receipt {
             id: "r1".into(), transaction_id: id.into(),
@@ -139,6 +139,117 @@ async fn replace_full_preserves_existing_bytes_when_payload_omits_them() {
 
     let got = queries::get_full(&pool, "t-edit").await.unwrap();
     assert_eq!(got.items[0].name, "Skim Milk");
+}
+
+#[tokio::test]
+async fn paid_at_roundtrips_through_insert_get_replace() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-paid");
+    f.people[0].paid_at = Some(1_700_000_000_000);
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    let got = queries::get_full(&pool, "t-paid").await.unwrap();
+    assert_eq!(got.people[0].paid_at, Some(1_700_000_000_000));
+    assert_eq!(got.people[1].paid_at, None);
+
+    // Edit and save: paid_at should persist for unchanged people.
+    let mut f2 = got.clone();
+    f2.receipts[0].image_bytes_base64 = String::new();
+    f2.items[0].name = "Skim Milk".into();
+    queries::replace_full(&pool, &f2).await.unwrap();
+
+    let got2 = queries::get_full(&pool, "t-paid").await.unwrap();
+    assert_eq!(got2.people[0].paid_at, Some(1_700_000_000_000));
+    assert_eq!(got2.people[1].paid_at, None);
+}
+
+#[tokio::test]
+async fn set_person_paid_sets_and_clears_timestamp() {
+    let pool = fresh_pool().await;
+    queries::insert_full(&pool, &sample_full("t-set")).await.unwrap();
+
+    queries::set_person_paid(&pool, "p1", true).await.unwrap();
+    let got = queries::get_full(&pool, "t-set").await.unwrap();
+    let p1 = got.people.iter().find(|p| p.id == "p1").unwrap();
+    assert!(p1.paid_at.is_some(), "p1 should have paid_at after set_person_paid(true)");
+    let p2 = got.people.iter().find(|p| p.id == "p2").unwrap();
+    assert!(p2.paid_at.is_none(), "p2 untouched");
+
+    queries::set_person_paid(&pool, "p1", false).await.unwrap();
+    let got = queries::get_full(&pool, "t-set").await.unwrap();
+    assert!(got.people.iter().find(|p| p.id == "p1").unwrap().paid_at.is_none());
+}
+
+#[tokio::test]
+async fn set_person_paid_bumps_transaction_updated_at() {
+    let pool = fresh_pool().await;
+    queries::insert_full(&pool, &sample_full("t-bump")).await.unwrap();
+
+    // Force a known starting updated_at.
+    sqlx::query("UPDATE transactions SET updated_at = 1 WHERE id = ?")
+        .bind("t-bump").execute(&pool).await.unwrap();
+
+    queries::set_person_paid(&pool, "p1", true).await.unwrap();
+
+    let row = sqlx::query("SELECT updated_at FROM transactions WHERE id = ?")
+        .bind("t-bump").fetch_one(&pool).await.unwrap();
+    let updated: i64 = row.get("updated_at");
+    assert!(updated > 1, "updated_at must be bumped above 1");
+}
+
+#[tokio::test]
+async fn list_summaries_aggregates_are_not_multiplied_by_joined_rows() {
+    // Regression: a dual LEFT JOIN on people AND items produces a
+    // cartesian product, which inflates both paid_count and total_cents.
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-cartesian");
+    // Add a second item so the join produces people_count * items_count rows.
+    f.items.push(Item {
+        id: "i2".into(),
+        transaction_id: "t-cartesian".into(),
+        receipt_id: Some("r1".into()),
+        raw_code: None,
+        name: "Bread".into(),
+        price_cents: 250,
+        kind: "item".into(),
+        position: 1,
+        assigned_person_ids: vec!["p1".into(), "p2".into()],
+    });
+    queries::insert_full(&pool, &f).await.unwrap();
+    queries::set_person_paid(&pool, "p1", true).await.unwrap();
+
+    let rows = queries::list_summaries(&pool).await.unwrap();
+    let row = rows.iter().find(|r| r.id == "t-cartesian").unwrap();
+    assert_eq!(row.people_count, 2);
+    assert_eq!(row.paid_count, 1, "paid_count must not be multiplied by items_count");
+    assert_eq!(row.total_cents, 349 + 250, "total_cents must not be multiplied by people_count");
+}
+
+#[tokio::test]
+async fn list_summaries_returns_paid_count() {
+    let pool = fresh_pool().await;
+    queries::insert_full(&pool, &sample_full("t-sum")).await.unwrap();
+
+    let before = queries::list_summaries(&pool).await.unwrap();
+    let row = before.iter().find(|r| r.id == "t-sum").unwrap();
+    assert_eq!(row.paid_count, 0);
+    assert_eq!(row.people_count, 2);
+
+    queries::set_person_paid(&pool, "p1", true).await.unwrap();
+
+    let after = queries::list_summaries(&pool).await.unwrap();
+    let row = after.iter().find(|r| r.id == "t-sum").unwrap();
+    assert_eq!(row.paid_count, 1);
+    assert_eq!(row.people_count, 2);
+}
+
+#[tokio::test]
+async fn set_person_paid_returns_not_found_for_unknown_id() {
+    let pool = fresh_pool().await;
+    queries::insert_full(&pool, &sample_full("t-nf")).await.unwrap();
+
+    let err = queries::set_person_paid(&pool, "no-such-person", true).await.unwrap_err();
+    assert!(matches!(err, scansplit_lib::error::AppError::NotFound));
 }
 
 #[tokio::test]

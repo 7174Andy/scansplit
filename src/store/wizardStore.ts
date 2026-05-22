@@ -158,7 +158,7 @@ export const useWizardStore = create<WizardState>()(
       addPerson: (name) => set((st) => ({
         people: [
           ...st.people,
-          { id: newId(), transactionId: st.transaction.id, name, position: st.people.length },
+          { id: newId(), transactionId: st.transaction.id, name, position: st.people.length, paidAt: null },
         ],
       })),
 

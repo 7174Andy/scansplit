@@ -17,6 +17,7 @@ pub struct Person {
     pub transaction_id: String,
     pub name: String,
     pub position: i64,
+    pub paid_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

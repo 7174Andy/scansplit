@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { SplitTotalsTable } from "./SplitTotalsTable";
 import type { ShareLine, SplitResult } from "../lib/types";
 
@@ -65,6 +65,75 @@ function renderTable() {
     (d as HTMLDetailsElement).open = true;
   });
 }
+
+describe("SplitTotalsTable paid status", () => {
+  afterEach(() => cleanup());
+
+  function renderWithPaid(opts: {
+    paidByPersonId?: Record<string, number | null>;
+    onTogglePaid?: (id: string, next: boolean) => void;
+  }) {
+    const split: SplitResult = {
+      totalCents: 1000,
+      perPerson: [
+        {
+          personId: "p1",
+          totalCents: 500,
+          itemBreakdown: [
+            line({ itemId: "i1", shareCents: 500, itemKind: "item", itemPriceCents: 1000, sharerCount: 2 }),
+          ],
+        },
+        {
+          personId: "p2",
+          totalCents: 500,
+          itemBreakdown: [
+            line({ itemId: "i1", shareCents: 500, itemKind: "item", itemPriceCents: 1000, sharerCount: 2 }),
+          ],
+        },
+      ],
+    };
+    return render(
+      <SplitTotalsTable
+        split={split}
+        personNames={{ p1: "Alice", p2: "Bob" }}
+        itemNames={{ i1: "Pizza" }}
+        currency="USD"
+        paidByPersonId={opts.paidByPersonId}
+        onTogglePaid={opts.onTogglePaid}
+      />
+    );
+  }
+
+  it("renders a checkbox per person when paidByPersonId is provided", () => {
+    renderWithPaid({ paidByPersonId: { p1: null, p2: null } });
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes.length).toBe(2);
+    expect((boxes[0] as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("checkbox reflects paid state via paidByPersonId", () => {
+    renderWithPaid({ paidByPersonId: { p1: 1_700_000_000_000, p2: null } });
+    const boxes = screen.getAllByRole("checkbox");
+    expect((boxes[0] as HTMLInputElement).checked).toBe(true);
+    expect((boxes[1] as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("clicking a checkbox invokes onTogglePaid with the next value", () => {
+    const calls: Array<[string, boolean]> = [];
+    renderWithPaid({
+      paidByPersonId: { p1: null, p2: null },
+      onTogglePaid: (id, next) => calls.push([id, next]),
+    });
+    const boxes = screen.getAllByRole("checkbox");
+    fireEvent.click(boxes[0]);
+    expect(calls).toEqual([["p1", true]]);
+  });
+
+  it("renders no checkbox when paidByPersonId is omitted (Step 5 fallback)", () => {
+    renderWithPaid({});
+    expect(screen.queryAllByRole("checkbox").length).toBe(0);
+  });
+});
 
 describe("SplitTotalsTable", () => {
   afterEach(() => cleanup());

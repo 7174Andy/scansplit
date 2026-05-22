@@ -63,6 +63,7 @@ export interface PersonRecord {
   transactionId: string;
   name: string;
   position: number;
+  paidAt: number | null;
 }
 
 export interface ItemRecord {
@@ -90,6 +91,7 @@ export interface TransactionSummary {
   currency: string;
   updatedAt: number;
   peopleCount: number;
+  paidCount: number;
   totalCents: number;
 }
 

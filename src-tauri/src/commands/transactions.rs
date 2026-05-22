@@ -46,3 +46,12 @@ pub async fn delete_transaction(
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn set_person_paid(
+    state: State<'_, AppState>,
+    person_id: String,
+    paid: bool,
+) -> AppResult<()> {
+    queries::set_person_paid(&state.pool, &person_id, paid).await
+}

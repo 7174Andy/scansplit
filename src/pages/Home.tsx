@@ -49,19 +49,34 @@ export default function Home() {
       )}
 
       <ul className="m-0 list-none p-0">
-        {rows?.map((r) => (
-          <li
-            key={r.id}
-            className="flex items-center justify-between border-b border-border py-3.5"
-          >
-            <Link to={`/transaction/${r.id}`} className="text-primary hover:underline">
-              {r.title}
-            </Link>
-            <span className="text-sm text-muted-foreground">
-              {formatCents(r.totalCents, r.currency)} · {r.peopleCount} people
-            </span>
-          </li>
-        ))}
+        {rows?.map((r) => {
+          const allPaid = r.peopleCount > 0 && r.paidCount === r.peopleCount;
+          const someTracked = r.peopleCount > 0;
+          return (
+            <li
+              key={r.id}
+              className="flex items-center justify-between border-b border-border py-3.5"
+            >
+              <Link to={`/transaction/${r.id}`} className="text-primary hover:underline">
+                {r.title}
+              </Link>
+              <span className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span>
+                  {formatCents(r.totalCents, r.currency)} · {r.peopleCount} people
+                </span>
+                {allPaid && (
+                  <span className="flex items-center gap-1.5">
+                    <span aria-hidden="true" className="size-2 rounded-full bg-green-500" />
+                    <span>Settled</span>
+                  </span>
+                )}
+                {!allPaid && someTracked && (
+                  <span>{r.paidCount} of {r.peopleCount} paid</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
