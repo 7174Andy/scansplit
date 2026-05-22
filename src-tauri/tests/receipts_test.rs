@@ -6,16 +6,20 @@ async fn fresh_pool() -> sqlx::SqlitePool {
         .connect("sqlite::memory:")
         .await
         .unwrap();
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
     pool
 }
 
 async fn seed_receipt(pool: &sqlx::SqlitePool, id: &str, bytes: &[u8]) {
     sqlx::query(
-        "INSERT INTO transactions (id, title, currency, created_at, updated_at)
+        "INSERT OR IGNORE INTO transactions (id, title, currency, created_at, updated_at)
          VALUES ('t1','x','USD',1,1)",
     )
-    .execute(pool).await.ok();
+    .execute(pool).await.unwrap();
     sqlx::query(
         "INSERT INTO receipts (id, transaction_id, image_path, position, scanned_at,
                                image_bytes, mime, byte_size)
