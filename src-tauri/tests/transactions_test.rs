@@ -198,6 +198,24 @@ async fn set_person_paid_bumps_transaction_updated_at() {
 }
 
 #[tokio::test]
+async fn list_summaries_returns_paid_count() {
+    let pool = fresh_pool().await;
+    queries::insert_full(&pool, &sample_full("t-sum")).await.unwrap();
+
+    let before = queries::list_summaries(&pool).await.unwrap();
+    let row = before.iter().find(|r| r.id == "t-sum").unwrap();
+    assert_eq!(row.paid_count, 0);
+    assert_eq!(row.people_count, 2);
+
+    queries::set_person_paid(&pool, "p1", true).await.unwrap();
+
+    let after = queries::list_summaries(&pool).await.unwrap();
+    let row = after.iter().find(|r| r.id == "t-sum").unwrap();
+    assert_eq!(row.paid_count, 1);
+    assert_eq!(row.people_count, 2);
+}
+
+#[tokio::test]
 async fn set_person_paid_returns_not_found_for_unknown_id() {
     let pool = fresh_pool().await;
     queries::insert_full(&pool, &sample_full("t-nf")).await.unwrap();

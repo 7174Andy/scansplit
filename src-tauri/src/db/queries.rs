@@ -263,6 +263,7 @@ pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSumma
     let rows = sqlx::query(
         "SELECT t.id, t.title, t.currency, t.updated_at,
                 COUNT(DISTINCT tp.id) AS people_count,
+                COALESCE(SUM(CASE WHEN tp.paid_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS paid_count,
                 COALESCE(SUM(i.price_cents), 0) AS total_cents
          FROM transactions t
          LEFT JOIN transaction_people tp ON tp.transaction_id = t.id
@@ -277,6 +278,7 @@ pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSumma
         currency: r.get("currency"),
         updated_at: r.get("updated_at"),
         people_count: r.get("people_count"),
+        paid_count: r.get("paid_count"),
         total_cents: r.get("total_cents"),
     }).collect())
 }
@@ -289,6 +291,7 @@ pub struct TransactionSummary {
     pub currency: String,
     pub updated_at: i64,
     pub people_count: i64,
+    pub paid_count: i64,
     pub total_cents: i64,
 }
 
