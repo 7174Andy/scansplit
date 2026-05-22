@@ -188,3 +188,126 @@ describe("computeSplit — discounts", () => {
     expect(result.perPerson[0].totalCents).toBe(900);
   });
 });
+
+describe("computeSplit — rounding bumps", () => {
+  it("attributes bumpedCents to exactly the people who absorbed the rounding remainder", () => {
+    // 1001¢ ÷ 3 = 333r2. Two people each get +1¢; one gets +0.
+    const result = computeSplit(
+      [item({ id: "i1", priceCents: 1001 })],
+      people("A", "B", "C")
+    );
+    const bumps = result.perPerson.map((p) => p.itemBreakdown[0].bumpedCents);
+    expect(bumps.reduce((s, b) => s + b, 0)).toBe(2);
+    expect(bumps.filter((b) => b === 1).length).toBe(2);
+    expect(bumps.filter((b) => b === 0).length).toBe(1);
+  });
+
+  it("share-sum invariant: per-line share totals equal the line price", () => {
+    const result = computeSplit(
+      [item({ id: "i1", priceCents: 1001 })],
+      people("A", "B", "C")
+    );
+    const sum = result.perPerson.reduce(
+      (s, p) => s + p.itemBreakdown[0].shareCents,
+      0
+    );
+    expect(sum).toBe(1001);
+  });
+
+  it("negative line price (discount) flips bump sign", () => {
+    // -100¢ proportional across A:600, B:400 subtotals → weights 60/40.
+    // -100 * 0.6 = -60 exact, -100 * 0.4 = -40 exact. Both exact, no bump.
+    // Use uneven amount to force a bump: -101¢
+    const ps = people("A", "B");
+    const result = computeSplit(
+      [
+        { id: "a1", name: "A", priceCents: 600, kind: "item", assignedPersonIds: ["p0"] },
+        { id: "b1", name: "B", priceCents: 400, kind: "item", assignedPersonIds: ["p1"] },
+        { id: "d1", name: "Disc", priceCents: -101, kind: "discount", assignedPersonIds: [] },
+      ],
+      ps
+    );
+    const discA = result.perPerson[0].itemBreakdown.find((b) => b.itemId === "d1")!;
+    const discB = result.perPerson[1].itemBreakdown.find((b) => b.itemId === "d1")!;
+    const bumps = [discA.bumpedCents, discB.bumpedCents];
+    expect(bumps.reduce((s, b) => s + b, 0)).toBe(-1);
+    expect(bumps.filter((b) => b === -1).length).toBe(1);
+  });
+});
+
+describe("computeSplit — ShareLine metadata", () => {
+  it("emits itemKind, itemPriceCents, sharerCount, isEveryone for subset items", () => {
+    const ps = people("A", "B", "C");
+    const result = computeSplit(
+      [{ ...item({ id: "i1", priceCents: 900 }), assignedPersonIds: ["p0", "p1"] }],
+      ps
+    );
+    const s = result.perPerson[0].itemBreakdown[0];
+    expect(s.itemKind).toBe("item");
+    expect(s.itemPriceCents).toBe(900);
+    expect(s.sharerCount).toBe(2);
+    expect(s.isEveryone).toBe(false);
+  });
+
+  it("marks everyone-shared items with isEveryone=true and sharerCount=people.length", () => {
+    const result = computeSplit(
+      [item({ id: "i1", priceCents: 600 })],
+      people("A", "B", "C")
+    );
+    const s = result.perPerson[0].itemBreakdown[0];
+    expect(s.isEveryone).toBe(true);
+    expect(s.sharerCount).toBe(3);
+  });
+
+  it("marks solo items with sharerCount=1, isEveryone=false", () => {
+    const ps = people("A", "B");
+    const result = computeSplit(
+      [{ ...item({ id: "i1", priceCents: 900 }), assignedPersonIds: ["p0"] }],
+      ps
+    );
+    const s = result.perPerson[0].itemBreakdown[0];
+    expect(s.sharerCount).toBe(1);
+    expect(s.isEveryone).toBe(false);
+  });
+
+  it("tax line: weightBasisPoints proportional to subtotal", () => {
+    // A owns 600, B owns 400 → 60% / 40%.
+    const result = computeSplit(
+      [
+        { id: "a1", name: "A's", priceCents: 600, kind: "item", assignedPersonIds: ["p0"] },
+        { id: "b1", name: "B's", priceCents: 400, kind: "item", assignedPersonIds: ["p1"] },
+        { id: "t1", name: "Tax", priceCents: 100, kind: "tax", assignedPersonIds: [] },
+      ],
+      people("A", "B")
+    );
+    const taxA = result.perPerson[0].itemBreakdown.find((b) => b.itemId === "t1")!;
+    const taxB = result.perPerson[1].itemBreakdown.find((b) => b.itemId === "t1")!;
+    expect(taxA.weightBasisPoints).toBe(6000);
+    expect(taxB.weightBasisPoints).toBe(4000);
+    expect(taxA.itemKind).toBe("tax");
+    expect(taxA.isEveryone).toBe(true);
+  });
+
+  it("zero-subtotal: tax weightBasisPoints is 0 for all people, shareCents is 0", () => {
+    const result = computeSplit(
+      [{ id: "t1", name: "Tax", priceCents: 100, kind: "tax", assignedPersonIds: [] }],
+      people("A", "B")
+    );
+    for (const p of result.perPerson) {
+      const tax = p.itemBreakdown[0];
+      expect(tax.weightBasisPoints).toBe(0);
+      expect(tax.shareCents).toBe(0);
+    }
+  });
+
+  it("tip emits itemKind=tip, isEveryone=true, sharerCount=people.length", () => {
+    const result = computeSplit(
+      [{ id: "tp", name: "Tip", priceCents: 600, kind: "tip", assignedPersonIds: [] }],
+      people("A", "B", "C")
+    );
+    const t = result.perPerson[0].itemBreakdown[0];
+    expect(t.itemKind).toBe("tip");
+    expect(t.isEveryone).toBe(true);
+    expect(t.sharerCount).toBe(3);
+  });
+});
