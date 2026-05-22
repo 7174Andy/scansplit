@@ -1,8 +1,26 @@
+use base64::Engine;
 use crate::db::models::{FullTransaction, Item, Person, Receipt, Transaction};
 use crate::error::AppResult;
 use sqlx::{Row, SqlitePool};
 
 pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
+    // Decode + validate bytes for every receipt before opening the tx, so we
+    // never half-write a transaction whose payload was invalid.
+    let mut decoded: Vec<(usize, Vec<u8>)> = Vec::with_capacity(full.receipts.len());
+    for (idx, r) in full.receipts.iter().enumerate() {
+        if r.image_bytes_base64.is_empty() {
+            return Err(crate::error::AppError::Other(format!(
+                "receipt {} missing image bytes", r.id
+            )));
+        }
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&r.image_bytes_base64)
+            .map_err(|e| crate::error::AppError::Other(format!(
+                "receipt {} base64 decode: {e}", r.id
+            )))?;
+        decoded.push((idx, bytes));
+    }
+
     let mut tx = pool.begin().await?;
 
     sqlx::query(
@@ -26,13 +44,18 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
         .execute(&mut *tx).await?;
     }
 
-    for r in &full.receipts {
+    for (idx, bytes) in &decoded {
+        let r = &full.receipts[*idx];
+        let mime = if r.mime.is_empty() { "image/jpeg" } else { r.mime.as_str() };
+        let size = bytes.len() as i64;
         sqlx::query(
-            "INSERT INTO receipts (id, transaction_id, image_path, position, scanned_at)
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO receipts (id, transaction_id, image_path, position, scanned_at,
+                                   image_bytes, mime, byte_size)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&r.id).bind(&r.transaction_id).bind(&r.image_path)
         .bind(r.position).bind(r.scanned_at)
+        .bind(bytes).bind(mime).bind(size)
         .execute(&mut *tx).await?;
     }
 
@@ -60,6 +83,57 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
 }
 
 pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
+    // Snapshot existing receipt bytes so payloads that omit bytes (the edit
+    // flow) preserve the original blob.
+    struct ExistingBytes {
+        bytes: Vec<u8>,
+        mime: String,
+        byte_size: i64,
+    }
+    let existing_rows = sqlx::query(
+        "SELECT id, image_bytes, mime, byte_size FROM receipts WHERE transaction_id = ?",
+    )
+    .bind(&full.transaction.id)
+    .fetch_all(pool).await?;
+    let existing: std::collections::HashMap<String, ExistingBytes> = existing_rows
+        .into_iter()
+        .map(|r| (
+            r.get::<String, _>("id"),
+            ExistingBytes {
+                bytes: r.get::<Vec<u8>, _>("image_bytes"),
+                mime: r.get::<String, _>("mime"),
+                byte_size: r.get::<i64, _>("byte_size"),
+            },
+        ))
+        .collect();
+
+    // Resolve final bytes for every receipt up front.
+    let mut resolved: Vec<(Vec<u8>, String, i64)> = Vec::with_capacity(full.receipts.len());
+    for r in &full.receipts {
+        if r.image_bytes_base64.is_empty() {
+            match existing.get(&r.id) {
+                Some(prev) if !prev.bytes.is_empty() => {
+                    let mime = if prev.mime.is_empty() { "image/jpeg".to_string() } else { prev.mime.clone() };
+                    resolved.push((prev.bytes.clone(), mime, prev.byte_size));
+                }
+                _ => {
+                    return Err(crate::error::AppError::Other(format!(
+                        "receipt {} missing image bytes (no existing row to fall back to)", r.id
+                    )));
+                }
+            }
+        } else {
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(&r.image_bytes_base64)
+                .map_err(|e| crate::error::AppError::Other(format!(
+                    "receipt {} base64 decode: {e}", r.id
+                )))?;
+            let mime = if r.mime.is_empty() { "image/jpeg".to_string() } else { r.mime.clone() };
+            let size = bytes.len() as i64;
+            resolved.push((bytes, mime, size));
+        }
+    }
+
     let mut tx = pool.begin().await?;
     sqlx::query("DELETE FROM items WHERE transaction_id = ?")
         .bind(&full.transaction.id).execute(&mut *tx).await?;
@@ -81,10 +155,17 @@ pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResul
             .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position)
             .execute(&mut *tx2).await?;
     }
-    for r in &full.receipts {
-        sqlx::query("INSERT INTO receipts (id, transaction_id, image_path, position, scanned_at) VALUES (?, ?, ?, ?, ?)")
-            .bind(&r.id).bind(&r.transaction_id).bind(&r.image_path).bind(r.position).bind(r.scanned_at)
-            .execute(&mut *tx2).await?;
+    for (i, r) in full.receipts.iter().enumerate() {
+        let (bytes, mime, size) = &resolved[i];
+        sqlx::query(
+            "INSERT INTO receipts (id, transaction_id, image_path, position, scanned_at,
+                                   image_bytes, mime, byte_size)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&r.id).bind(&r.transaction_id).bind(&r.image_path)
+        .bind(r.position).bind(r.scanned_at)
+        .bind(bytes).bind(mime).bind(size)
+        .execute(&mut *tx2).await?;
     }
     for it in &full.items {
         sqlx::query("INSERT INTO items (id, transaction_id, receipt_id, raw_code, name, price_cents, kind, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -128,16 +209,22 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
     .collect();
 
     let receipts: Vec<Receipt> = sqlx::query(
-        "SELECT id, transaction_id, image_path, position, scanned_at FROM receipts
-         WHERE transaction_id = ? ORDER BY position",
+        "SELECT id, transaction_id, image_path, position, scanned_at, mime, byte_size
+           FROM receipts
+          WHERE transaction_id = ? ORDER BY position",
     )
     .bind(id)
     .fetch_all(pool).await?
     .into_iter()
     .map(|r| Receipt {
-        id: r.get("id"), transaction_id: r.get("transaction_id"),
-        image_path: r.get("image_path"), position: r.get("position"),
+        id: r.get("id"),
+        transaction_id: r.get("transaction_id"),
+        image_path: r.get("image_path"),
+        position: r.get("position"),
         scanned_at: r.get("scanned_at"),
+        image_bytes_base64: String::new(),
+        mime: r.get("mime"),
+        byte_size: r.get("byte_size"),
     })
     .collect();
 

@@ -40,6 +40,11 @@ export interface ReceiptRecord {
   imagePath: string;
   position: number;
   scannedAt: number;
+  // present in-memory during the wizard (set by scan, sent to Rust on save).
+  // absent on the response from get_transaction.
+  imageBytesBase64?: string;
+  mime?: string;
+  byteSize?: number;
 }
 
 export interface PersonRecord {
@@ -91,7 +96,16 @@ export interface ParsedReceipt {
 
 export interface ScanResult {
   imagePath: string;
+  imageBytesBase64: string;
+  mime: string;
+  byteSize: number;
   parsed: ParsedReceipt;
+}
+
+export interface ReceiptImagePayload {
+  mime: string;
+  bytesBase64: string;
+  byteSize: number;
 }
 
 export interface AppErrorPayload {
