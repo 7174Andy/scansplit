@@ -15,10 +15,21 @@ export interface LineItem {
   receiptId?: string;
 }
 
+export interface ShareLine {
+  itemId: string;
+  shareCents: number;
+  itemKind: ItemKind;
+  itemPriceCents: number;
+  sharerCount: number;
+  isEveryone: boolean;
+  weightBasisPoints?: number;
+  bumpedCents: number;
+}
+
 export interface PersonTotal {
   personId: string;
   totalCents: number;
-  itemBreakdown: Array<{ itemId: string; shareCents: number }>;
+  itemBreakdown: ShareLine[];
 }
 
 export interface SplitResult {
