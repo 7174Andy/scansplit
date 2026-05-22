@@ -27,6 +27,13 @@ pub struct Receipt {
     pub image_path: String,
     pub position: i64,
     pub scanned_at: i64,
+
+    #[serde(default)]
+    pub image_bytes_base64: String,
+    #[serde(default)]
+    pub mime: String,
+    #[serde(default)]
+    pub byte_size: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
