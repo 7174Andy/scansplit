@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ScanSplit — split receipts fairly, locally</title>
+  <meta name="description" content="A fast, local-first desktop app that turns receipt photos into a fair per-person split. macOS, Windows, Linux.">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#">
+      <img src="logo.svg" alt="" width="28" height="28">
+      <span>ScanSplit</span>
+    </a>
+    <nav>
+      <a href="#install">Install</a>
+      <a href="#features">Features</a>
+      <a href="#downloads">Downloads</a>
+      <a href="https://github.com/7174Andy/scansplit" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Split receipts fairly. Locally.</h1>
+      <p class="tagline">Snap a receipt, assign items to people, get an exact per-person total — without an account, a cloud, or a paywall.</p>
+    </section>
+
+    <section id="install" class="install">
+      <div class="tabs">
+        <input type="radio" id="tab-unix" name="install-tab" checked>
+        <label for="tab-unix">macOS / Linux</label>
+        <input type="radio" id="tab-win" name="install-tab">
+        <label for="tab-win">Windows</label>
+
+        <div class="tab-content tab-unix">
+          <pre><code id="cmd-unix">curl -fsSL https://7174andy.github.io/scansplit/install.sh | sh</code></pre>
+          <button class="copy" data-target="cmd-unix" type="button">Copy</button>
+        </div>
+        <div class="tab-content tab-win">
+          <pre><code id="cmd-win">irm https://7174andy.github.io/scansplit/install.ps1 | iex</code></pre>
+          <button class="copy" data-target="cmd-win" type="button">Copy</button>
+        </div>
+      </div>
+      <p class="hint">macOS / Linux installs into <code>/Applications</code> or <code>~/.local/bin</code>. Windows opens the MSI installer.</p>
+    </section>
+
+    <section id="features" class="features">
+      <h2>What it does</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Multi-receipt transactions</h3>
+          <p>Combine several receipts into one shared bill — dinner + drinks tab, one split.</p>
+        </div>
+        <div class="card">
+          <h3>AI line-item extraction</h3>
+          <p>Claude Sonnet 4.6 reads the photo and returns structured items, tax, tip, and discounts.</p>
+        </div>
+        <div class="card">
+          <h3>Per-person assignment</h3>
+          <p>Toggle who had what. An empty assignment defaults to "everyone."</p>
+        </div>
+        <div class="card">
+          <h3>Exact fair-share math</h3>
+          <p>Integer cents, largest-remainder allocation, proportional tax and tip. Totals always sum exactly.</p>
+        </div>
+        <div class="card">
+          <h3>Learns over time</h3>
+          <p>Correct a cryptic SKU once ("ITEM 4823" → "Caesar Salad") and ScanSplit remembers it for that merchant.</p>
+        </div>
+        <div class="card">
+          <h3>Local-first</h3>
+          <p>Data lives in a SQLite database on your machine. The only outbound call is the OCR request to Anthropic.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="screenshot-section">
+      <div class="screenshot-frame">
+        <div class="window-chrome">
+          <span class="dot dot-r"></span>
+          <span class="dot dot-y"></span>
+          <span class="dot dot-g"></span>
+        </div>
+        <img src="screenshot.png" alt="ScanSplit Step 5 — per-person totals">
+      </div>
+    </section>
+
+    <section id="downloads" class="downloads">
+      <h2>Direct downloads</h2>
+      <p>Prefer to click instead? Pick your platform.</p>
+      <table>
+        <thead>
+          <tr><th>Platform</th><th>File</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>macOS (Apple Silicon)</td><td><a class="dl" data-pattern="aarch64\.dmg$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
+          <tr><td>macOS (Intel)</td><td><a class="dl" data-pattern="_x64\.dmg$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
+          <tr><td>Windows (MSI)</td><td><a class="dl" data-pattern="_x64_en-US\.msi$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
+          <tr><td>Windows (NSIS)</td><td><a class="dl" data-pattern="_x64-setup\.exe$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
+          <tr><td>Linux (Debian/Ubuntu)</td><td><a class="dl" data-pattern="_amd64\.deb$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
+          <tr><td>Linux (AppImage)</td><td><a class="dl" data-pattern="_amd64\.AppImage$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
+        </tbody>
+      </table>
+      <p id="first-run" class="note">
+        Bundles are unsigned. <strong>macOS:</strong> right-click → <em>Open</em> the first time (or use the install script, which strips the quarantine flag for you). <strong>Windows:</strong> click <em>More info</em> → <em>Run anyway</em> when SmartScreen warns.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p><a href="https://github.com/7174Andy/scansplit">github.com/7174Andy/scansplit</a></p>
+  </footer>
+
+  <script>
+    document.querySelectorAll('.copy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var target = document.getElementById(btn.dataset.target);
+        navigator.clipboard.writeText(target.textContent).then(function () {
+          var orig = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(function () { btn.textContent = orig; }, 1500);
+        }).catch(function () {});
+      });
+    });
+
+    fetch('https://api.github.com/repos/7174Andy/scansplit/releases/latest')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (release) {
+        if (!release || !release.assets) return;
+        document.querySelectorAll('a.dl').forEach(function (a) {
+          var pattern = new RegExp(a.dataset.pattern);
+          var asset = release.assets.find(function (x) { return pattern.test(x.name); });
+          if (asset) {
+            a.href = asset.browser_download_url;
+            a.textContent = asset.name;
+          }
+        });
+      })
+      .catch(function () {});
+  </script>
+</body>
+</html>
