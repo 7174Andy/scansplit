@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Copy as CopyIcon, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Copy as CopyIcon, Image as ImageIcon, Pencil, Trash2 } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { api } from "@/lib/tauri";
 import { computeSplit } from "@/lib/splitMath";
 import { SplitTotalsTable } from "@/components/SplitTotalsTable";
+import { ReceiptViewerDialog } from "@/components/ReceiptViewerDialog";
 import { formatCents } from "@/lib/formatCurrency";
 import { useWizardStore } from "@/store/wizardStore";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,10 @@ export default function TransactionView() {
   const navigate = useNavigate();
   const [full, setFull] = useState<FullTransaction | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<{ open: boolean; index: number }>({
+    open: false,
+    index: 0,
+  });
   const loadFrom = useWizardStore((s) => s.loadFrom);
 
   useEffect(() => {
@@ -73,6 +78,9 @@ export default function TransactionView() {
     navigate("/transaction/new");
   }
 
+  const hasReceipts = full.receipts.length > 0;
+  const viewLabel = full.receipts.length > 1 ? "View receipts" : "View receipt";
+
   return (
     <div className="mx-auto max-w-2xl p-6">
       <Button variant="ghost" onClick={() => navigate("/")}>
@@ -83,6 +91,11 @@ export default function TransactionView() {
         <Button variant="outline" onClick={copy}>
           <CopyIcon className="size-4" /> Copy
         </Button>
+        {hasReceipts && (
+          <Button variant="outline" onClick={() => setViewer({ open: true, index: 0 })}>
+            <ImageIcon className="size-4" /> {viewLabel}
+          </Button>
+        )}
         <Button variant="outline" onClick={edit}>
           <Pencil className="size-4" /> Edit
         </Button>
@@ -95,6 +108,13 @@ export default function TransactionView() {
         personNames={personNames}
         itemNames={itemNames}
         currency={full.transaction.currency}
+      />
+
+      <ReceiptViewerDialog
+        receipts={full.receipts}
+        initialIndex={viewer.index}
+        open={viewer.open}
+        onOpenChange={(o) => setViewer((v) => ({ ...v, open: o }))}
       />
     </div>
   );
