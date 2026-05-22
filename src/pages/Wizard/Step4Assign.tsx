@@ -30,9 +30,9 @@ export function Step4Assign({ onBack, onNext }: { onBack: () => void; onNext: ()
       </p>
 
       {items.filter((i) => i.kind === "item").map((it) => (
-        <div key={it.id} className="grid grid-cols-[1fr_80px_2fr] gap-3 border-b border-border py-2.5">
-          <div>
-            <div>{it.name}</div>
+        <div key={it.id} className="grid grid-cols-[1fr_80px_2fr] items-center gap-3 border-b border-border py-2.5">
+          <div className="min-w-0">
+            <div className="line-clamp-2" title={it.name}>{it.name}</div>
             <div className="text-[13px] text-muted-foreground">
               {formatCents(it.priceCents, transaction.currency)}
             </div>
