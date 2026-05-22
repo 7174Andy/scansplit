@@ -39,3 +39,22 @@ fn rejects_invalid_bytes() {
         scansplit_lib::error::AppError::UnsupportedImageFormat(_)
     ));
 }
+
+#[test]
+fn extreme_aspect_ratio_does_not_panic() {
+    // 1x10000 would round nw to 0 without the clamp -> resize_exact panic.
+    let src = make_png(1, 10000);
+    let out = process_for_storage(&src).unwrap();
+    let decoded = image::load_from_memory(&out.bytes).unwrap();
+    assert_eq!(decoded.height(), 2000);
+    assert!(decoded.width() >= 1);
+}
+
+#[test]
+fn resizes_when_over_max_dim_portrait() {
+    let src = make_png(2000, 3000);
+    let out = process_for_storage(&src).unwrap();
+    let decoded = image::load_from_memory(&out.bytes).unwrap();
+    assert_eq!(decoded.height(), 2000);
+    assert_eq!(decoded.width(), 1333);
+}

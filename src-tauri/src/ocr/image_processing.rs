@@ -22,9 +22,11 @@ pub fn process_for_storage(source: &[u8]) -> AppResult<ProcessedImage> {
     let (w, h) = (img.width(), img.height());
     let resized = if w.max(h) > MAX_EDGE {
         let (nw, nh) = if w >= h {
-            (MAX_EDGE, (h as f32 * MAX_EDGE as f32 / w as f32) as u32)
+            let nh = (h as f32 * MAX_EDGE as f32 / w as f32).round() as u32;
+            (MAX_EDGE, nh.max(1))
         } else {
-            ((w as f32 * MAX_EDGE as f32 / h as f32) as u32, MAX_EDGE)
+            let nw = (w as f32 * MAX_EDGE as f32 / h as f32).round() as u32;
+            (nw.max(1), MAX_EDGE)
         };
         img.resize_exact(nw, nh, FilterType::Lanczos3)
     } else {
