@@ -13,10 +13,13 @@ interface Props {
 export function SplitTotalsTable({ split, personNames, itemNames, currency }: Props) {
   return (
     <div>
-      <div className="flex items-center justify-between pb-1 text-sm text-muted-foreground">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>Per-person totals</span>
         <SplitMathHelpDialog />
       </div>
+      <p className="pb-1 text-xs text-muted-foreground/70">
+        Click a name to see how it's calculated.
+      </p>
       {split.perPerson.map((p) => (
         <details
           key={p.personId}
