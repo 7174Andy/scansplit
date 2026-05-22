@@ -12,6 +12,7 @@ interface TauriApi {
   getTransaction: (id: string) => Promise<FullTransaction>;
   listTransactions: () => Promise<TransactionSummary[]>;
   deleteTransaction: (id: string) => Promise<void>;
+  setPersonPaid: (personId: string, paid: boolean) => Promise<void>;
   getApiKey: () => Promise<string | null>;
   setApiKey: (key: string) => Promise<void>;
   deleteApiKey: () => Promise<void>;
@@ -29,6 +30,8 @@ const realApi: TauriApi = {
   getTransaction: (id) => invoke<FullTransaction>("get_transaction", { id }),
   listTransactions: () => invoke<TransactionSummary[]>("list_transactions"),
   deleteTransaction: (id) => invoke<void>("delete_transaction", { id }),
+  setPersonPaid: (personId, paid) =>
+    invoke<void>("set_person_paid", { personId, paid }),
   getApiKey: () => invoke<string | null>("get_api_key"),
   setApiKey: (key) => invoke<void>("set_api_key", { key }),
   deleteApiKey: () => invoke<void>("delete_api_key"),
@@ -61,10 +64,18 @@ const stubApi: TauriApi = {
           currency: lastSaved.transaction.currency,
           updatedAt: lastSaved.transaction.updatedAt,
           peopleCount: lastSaved.people.length,
+          paidCount: lastSaved.people.filter((p) => p.paidAt != null).length,
           totalCents: lastSaved.items.reduce((s, i) => s + i.priceCents, 0),
         }]
       : [],
   deleteTransaction: async () => { lastSaved = null; },
+  setPersonPaid: async (personId, paid) => {
+    if (!lastSaved) return;
+    const person = lastSaved.people.find((p) => p.id === personId);
+    if (!person) return;
+    person.paidAt = paid ? Date.now() : null;
+    lastSaved.transaction.updatedAt = Math.floor(Date.now() / 1000);
+  },
   getApiKey: async () => "test-key",
   setApiKey: async () => {},
   deleteApiKey: async () => {},
