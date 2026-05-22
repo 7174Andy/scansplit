@@ -23,6 +23,9 @@ Package manager is **pnpm**. The Tauri shell launches Vite via `beforeDevCommand
 | Rust unit + integration tests | `cd src-tauri && cargo test` |
 | Single Rust test | `cd src-tauri && cargo test --test ocr_test learned_expansion_fills_in_blank_name` |
 | Typecheck + frontend build | `pnpm build` |
+| Regenerate app icon from logo SVG | `rsvg-convert -w 512 -h 512 site/logo.svg -o src-tauri/icons/icon.png` |
+
+Regenerating the icon requires `librsvg` (`brew install librsvg` on macOS). Re-run the command whenever `site/logo.svg` changes.
 
 Dev server runs on port **1420** with `strictPort: true`; Playwright's `baseURL` and Tauri's `devUrl` both point there.
 
