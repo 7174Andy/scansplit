@@ -37,10 +37,10 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
 
     for p in &full.people {
         sqlx::query(
-            "INSERT INTO transaction_people (id, transaction_id, name, position)
-             VALUES (?, ?, ?, ?)",
+            "INSERT INTO transaction_people (id, transaction_id, name, position, paid_at)
+             VALUES (?, ?, ?, ?, ?)",
         )
-        .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position)
+        .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position).bind(p.paid_at)
         .execute(&mut *tx).await?;
     }
 
@@ -151,8 +151,8 @@ pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResul
 
     let mut tx2 = pool.begin().await?;
     for p in &full.people {
-        sqlx::query("INSERT INTO transaction_people (id, transaction_id, name, position) VALUES (?, ?, ?, ?)")
-            .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position)
+        sqlx::query("INSERT INTO transaction_people (id, transaction_id, name, position, paid_at) VALUES (?, ?, ?, ?, ?)")
+            .bind(&p.id).bind(&p.transaction_id).bind(&p.name).bind(p.position).bind(p.paid_at)
             .execute(&mut *tx2).await?;
     }
     for (i, r) in full.receipts.iter().enumerate() {
@@ -196,7 +196,7 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
     };
 
     let people: Vec<Person> = sqlx::query(
-        "SELECT id, transaction_id, name, position FROM transaction_people
+        "SELECT id, transaction_id, name, position, paid_at FROM transaction_people
          WHERE transaction_id = ? ORDER BY position",
     )
     .bind(id)
@@ -205,6 +205,7 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
     .map(|r| Person {
         id: r.get("id"), transaction_id: r.get("transaction_id"),
         name: r.get("name"), position: r.get("position"),
+        paid_at: r.get("paid_at"),
     })
     .collect();
 

@@ -24,8 +24,8 @@ fn sample_full(id: &str) -> FullTransaction {
             updated_at: 1,
         },
         people: vec![
-            Person { id: "p1".into(), transaction_id: id.into(), name: "Alice".into(), position: 0 },
-            Person { id: "p2".into(), transaction_id: id.into(), name: "Bob".into(), position: 1 },
+            Person { id: "p1".into(), transaction_id: id.into(), name: "Alice".into(), position: 0, paid_at: None },
+            Person { id: "p2".into(), transaction_id: id.into(), name: "Bob".into(), position: 1, paid_at: None },
         ],
         receipts: vec![Receipt {
             id: "r1".into(), transaction_id: id.into(),
@@ -139,6 +139,28 @@ async fn replace_full_preserves_existing_bytes_when_payload_omits_them() {
 
     let got = queries::get_full(&pool, "t-edit").await.unwrap();
     assert_eq!(got.items[0].name, "Skim Milk");
+}
+
+#[tokio::test]
+async fn paid_at_roundtrips_through_insert_get_replace() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-paid");
+    f.people[0].paid_at = Some(1_700_000_000_000);
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    let got = queries::get_full(&pool, "t-paid").await.unwrap();
+    assert_eq!(got.people[0].paid_at, Some(1_700_000_000_000));
+    assert_eq!(got.people[1].paid_at, None);
+
+    // Edit and save: paid_at should persist for unchanged people.
+    let mut f2 = got.clone();
+    f2.receipts[0].image_bytes_base64 = String::new();
+    f2.items[0].name = "Skim Milk".into();
+    queries::replace_full(&pool, &f2).await.unwrap();
+
+    let got2 = queries::get_full(&pool, "t-paid").await.unwrap();
+    assert_eq!(got2.people[0].paid_at, Some(1_700_000_000_000));
+    assert_eq!(got2.people[1].paid_at, None);
 }
 
 #[tokio::test]
