@@ -198,6 +198,34 @@ async fn set_person_paid_bumps_transaction_updated_at() {
 }
 
 #[tokio::test]
+async fn list_summaries_aggregates_are_not_multiplied_by_joined_rows() {
+    // Regression: a dual LEFT JOIN on people AND items produces a
+    // cartesian product, which inflates both paid_count and total_cents.
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-cartesian");
+    // Add a second item so the join produces people_count * items_count rows.
+    f.items.push(Item {
+        id: "i2".into(),
+        transaction_id: "t-cartesian".into(),
+        receipt_id: Some("r1".into()),
+        raw_code: None,
+        name: "Bread".into(),
+        price_cents: 250,
+        kind: "item".into(),
+        position: 1,
+        assigned_person_ids: vec!["p1".into(), "p2".into()],
+    });
+    queries::insert_full(&pool, &f).await.unwrap();
+    queries::set_person_paid(&pool, "p1", true).await.unwrap();
+
+    let rows = queries::list_summaries(&pool).await.unwrap();
+    let row = rows.iter().find(|r| r.id == "t-cartesian").unwrap();
+    assert_eq!(row.people_count, 2);
+    assert_eq!(row.paid_count, 1, "paid_count must not be multiplied by items_count");
+    assert_eq!(row.total_cents, 349 + 250, "total_cents must not be multiplied by people_count");
+}
+
+#[tokio::test]
 async fn list_summaries_returns_paid_count() {
     let pool = fresh_pool().await;
     queries::insert_full(&pool, &sample_full("t-sum")).await.unwrap();

@@ -260,15 +260,26 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
 }
 
 pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSummary>> {
+    // Aggregate people and items in independent subqueries so the joins
+    // don't multiply each other (people_count × items_count rows).
     let rows = sqlx::query(
         "SELECT t.id, t.title, t.currency, t.updated_at,
-                COUNT(DISTINCT tp.id) AS people_count,
-                COALESCE(SUM(CASE WHEN tp.paid_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS paid_count,
-                COALESCE(SUM(i.price_cents), 0) AS total_cents
+                COALESCE(p.people_count, 0) AS people_count,
+                COALESCE(p.paid_count, 0)   AS paid_count,
+                COALESCE(i.total_cents, 0)  AS total_cents
          FROM transactions t
-         LEFT JOIN transaction_people tp ON tp.transaction_id = t.id
-         LEFT JOIN items i ON i.transaction_id = t.id
-         GROUP BY t.id
+         LEFT JOIN (
+             SELECT transaction_id,
+                    COUNT(*) AS people_count,
+                    SUM(CASE WHEN paid_at IS NOT NULL THEN 1 ELSE 0 END) AS paid_count
+             FROM transaction_people
+             GROUP BY transaction_id
+         ) p ON p.transaction_id = t.id
+         LEFT JOIN (
+             SELECT transaction_id, SUM(price_cents) AS total_cents
+             FROM items
+             GROUP BY transaction_id
+         ) i ON i.transaction_id = t.id
          ORDER BY t.updated_at DESC",
     )
     .fetch_all(pool).await?;
