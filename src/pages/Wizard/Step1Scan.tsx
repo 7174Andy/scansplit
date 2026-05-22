@@ -100,7 +100,7 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
         position: receipts.length, scannedAt: 0,
         imageBytesBase64: PLACEHOLDER_JPEG_B64,
         mime: "image/jpeg",
-        byteSize: 131,
+        byteSize: 286,
       } as any);
       setScanStatus(id, "ok");
       mergeParsed(id, parsed);
@@ -118,7 +118,7 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
         position: receipts.length, scannedAt: 0,
         imageBytesBase64: PLACEHOLDER_JPEG_B64,
         mime: "image/jpeg",
-        byteSize: 131,
+        byteSize: 286,
       } as any);
       setScanStatus(receiptId, "ok");
       mergeParsed(receiptId, { merchant: null, items: [] });
