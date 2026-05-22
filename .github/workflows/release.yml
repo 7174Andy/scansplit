@@ -16,10 +16,16 @@ jobs:
         include:
           - platform: macos-arm64
             runner: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-intel
+            runner: macos-13
+            args: --target x86_64-apple-darwin
           - platform: windows-x64
             runner: windows-latest
+            args: ''
           - platform: linux-x64
             runner: ubuntu-22.04
+            args: ''
 
     runs-on: ${{ matrix.runner }}
 
@@ -59,3 +65,4 @@ jobs:
           releaseName: 'ScanSplit ${{ github.ref_name }}'
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.args }}
