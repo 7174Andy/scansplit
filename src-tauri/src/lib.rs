@@ -36,6 +36,7 @@ pub fn run() {
             commands::transactions::get_transaction,
             commands::transactions::list_transactions,
             commands::transactions::delete_transaction,
+            commands::transactions::set_person_paid,
             commands::settings::get_api_key,
             commands::settings::set_api_key,
             commands::settings::delete_api_key,

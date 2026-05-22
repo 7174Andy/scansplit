@@ -303,3 +303,38 @@ pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<Vec<String>> {
         .bind(id).execute(pool).await?;
     Ok(paths)
 }
+
+pub async fn set_person_paid(
+    pool: &SqlitePool,
+    person_id: &str,
+    paid: bool,
+) -> AppResult<()> {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let new_paid_at: Option<i64> = if paid { Some(now_ms) } else { None };
+
+    let mut tx = pool.begin().await?;
+
+    let result = sqlx::query(
+        "UPDATE transaction_people SET paid_at = ? WHERE id = ?",
+    )
+    .bind(new_paid_at)
+    .bind(person_id)
+    .execute(&mut *tx)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(crate::error::AppError::NotFound);
+    }
+
+    sqlx::query(
+        "UPDATE transactions SET updated_at = ?
+         WHERE id = (SELECT transaction_id FROM transaction_people WHERE id = ?)",
+    )
+    .bind(now_ms)
+    .bind(person_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(())
+}

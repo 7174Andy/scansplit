@@ -164,6 +164,49 @@ async fn paid_at_roundtrips_through_insert_get_replace() {
 }
 
 #[tokio::test]
+async fn set_person_paid_sets_and_clears_timestamp() {
+    let pool = fresh_pool().await;
+    queries::insert_full(&pool, &sample_full("t-set")).await.unwrap();
+
+    queries::set_person_paid(&pool, "p1", true).await.unwrap();
+    let got = queries::get_full(&pool, "t-set").await.unwrap();
+    let p1 = got.people.iter().find(|p| p.id == "p1").unwrap();
+    assert!(p1.paid_at.is_some(), "p1 should have paid_at after set_person_paid(true)");
+    let p2 = got.people.iter().find(|p| p.id == "p2").unwrap();
+    assert!(p2.paid_at.is_none(), "p2 untouched");
+
+    queries::set_person_paid(&pool, "p1", false).await.unwrap();
+    let got = queries::get_full(&pool, "t-set").await.unwrap();
+    assert!(got.people.iter().find(|p| p.id == "p1").unwrap().paid_at.is_none());
+}
+
+#[tokio::test]
+async fn set_person_paid_bumps_transaction_updated_at() {
+    let pool = fresh_pool().await;
+    queries::insert_full(&pool, &sample_full("t-bump")).await.unwrap();
+
+    // Force a known starting updated_at.
+    sqlx::query("UPDATE transactions SET updated_at = 1 WHERE id = ?")
+        .bind("t-bump").execute(&pool).await.unwrap();
+
+    queries::set_person_paid(&pool, "p1", true).await.unwrap();
+
+    let row = sqlx::query("SELECT updated_at FROM transactions WHERE id = ?")
+        .bind("t-bump").fetch_one(&pool).await.unwrap();
+    let updated: i64 = row.get("updated_at");
+    assert!(updated > 1, "updated_at must be bumped above 1");
+}
+
+#[tokio::test]
+async fn set_person_paid_returns_not_found_for_unknown_id() {
+    let pool = fresh_pool().await;
+    queries::insert_full(&pool, &sample_full("t-nf")).await.unwrap();
+
+    let err = queries::set_person_paid(&pool, "no-such-person", true).await.unwrap_err();
+    assert!(matches!(err, scansplit_lib::error::AppError::NotFound));
+}
+
+#[tokio::test]
 async fn replace_full_overwrites_when_payload_includes_bytes() {
     let pool = fresh_pool().await;
     let f1 = sample_full("t-rescan");
