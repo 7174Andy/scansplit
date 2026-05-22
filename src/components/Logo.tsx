@@ -1,12 +1,16 @@
+import type { SVGProps } from "react";
 import { cn } from "@/lib/utils";
 
-export function Logo({ className }: { className?: string }) {
+export function Logo({ className, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 64 64"
       xmlns="http://www.w3.org/2000/svg"
+      width="1em"
+      height="1em"
       role="img"
       aria-label="ScanSplit logo"
+      {...props}
       className={cn("text-amber-500", className)}
     >
       <path

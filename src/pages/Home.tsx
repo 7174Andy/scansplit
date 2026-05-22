@@ -22,7 +22,7 @@ export default function Home() {
     <div className="mx-auto max-w-3xl p-8">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Logo className="size-9" />
+          <Logo className="size-9" aria-hidden="true" />
           <h1 className="text-3xl font-bold">ScanSplit</h1>
         </div>
         <div className="flex gap-2">
