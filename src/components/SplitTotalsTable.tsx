@@ -1,5 +1,6 @@
 import type { SplitResult } from "../lib/splitMath";
 import { formatCents } from "../lib/formatCurrency";
+import { SplitMathHelpDialog } from "./SplitMathHelpDialog";
 
 interface Props {
   split: SplitResult;
@@ -11,6 +12,19 @@ interface Props {
 export function SplitTotalsTable({ split, personNames, itemNames, currency }: Props) {
   return (
     <div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingBottom: 4,
+          color: "#888",
+          fontSize: 13,
+        }}
+      >
+        <span>Per-person totals</span>
+        <SplitMathHelpDialog />
+      </div>
       {split.perPerson.map((p) => (
         <details key={p.personId} style={{ borderBottom: "1px solid #2a2a2a", padding: "8px 0" }}>
           <summary style={{ display: "flex", justifyContent: "space-between" }}>

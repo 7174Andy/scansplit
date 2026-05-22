@@ -1,17 +1,13 @@
 import type { LineItem, Person, PersonTotal, SplitResult } from "./types";
 export type { SplitResult } from "./types";
 
-/**
- * Split `amountCents` among `sharerIds` using the largest-remainder method.
- * `rotation` shifts which sharer receives the first leftover cent, so callers
- * can round-robin across many items and keep per-person totals balanced
- * (without it the same sharer collects every odd cent).
- * Sum equals amountCents exactly. Deterministic for any (amount, sharers, rotation).
- */
+// Split exactly; leftover cents go to whichever sharer is currently furthest
+// from balance in the direction the cent corrects (lowest for charges, highest
+// for discounts). Ties broken by id order for determinism.
 function allocate(
   amountCents: number,
   sharerIds: string[],
-  rotation: number = 0
+  currentTotals: Map<string, number>
 ): Map<string, number> {
   const n = sharerIds.length;
   const sign = amountCents < 0 ? -1 : 1;
@@ -20,9 +16,28 @@ function allocate(
   const remainder = absAmount - base * n;
   const out = new Map<string, number>();
   for (const id of sharerIds) out.set(id, sign * base);
+  if (remainder === 0) return out;
+
+  const working = new Map<string, number>();
+  for (const id of sharerIds) {
+    working.set(id, (currentTotals.get(id) ?? 0) + sign * base);
+  }
+  const isCharge = sign > 0;
   for (let i = 0; i < remainder; i++) {
-    const id = sharerIds[(i + rotation) % n];
-    out.set(id, out.get(id)! + sign);
+    let pickId = sharerIds[0];
+    let pickTotal = working.get(pickId)!;
+    for (let j = 1; j < sharerIds.length; j++) {
+      const id = sharerIds[j];
+      const t = working.get(id)!;
+      if (isCharge ? t < pickTotal : t > pickTotal) {
+        pickId = id;
+        pickTotal = t;
+      } else if (t === pickTotal && id < pickId) {
+        pickId = id;
+      }
+    }
+    out.set(pickId, out.get(pickId)! + sign);
+    working.set(pickId, pickTotal + sign);
   }
   return out;
 }
@@ -79,21 +94,21 @@ export function computeSplit(
     ])
   );
 
-  // Pass 1: items, exact-sum allocation. itemSeq rotates the leftover-cent
-  // recipient across items so person 0 doesn't always collect the odd cents.
-  let itemSeq = 0;
+  // Pass 1: items, exact-sum allocation. Running totals feed back into
+  // allocate so leftover cents self-balance across items.
+  const running = new Map<string, number>(people.map((p) => [p.id, 0]));
   for (const it of items) {
     if (it.kind !== "item") continue;
     const sharers =
       it.assignedPersonIds.length === 0
         ? people.map((p) => p.id)
         : it.assignedPersonIds;
-    const shares = allocate(it.priceCents, sharers, itemSeq);
-    itemSeq++;
+    const shares = allocate(it.priceCents, sharers, running);
     for (const [pid, share] of shares) {
       const t = totals.get(pid)!;
       t.totalCents += share;
       t.itemBreakdown.push({ itemId: it.id, shareCents: share });
+      running.set(pid, running.get(pid)! + share);
     }
   }
 
@@ -101,14 +116,20 @@ export function computeSplit(
     Array.from(totals.values()).map((t) => [t.personId, t.totalCents])
   );
 
-  // Pass 2: tax / tip / discount, proportional to person subtotal.
+  // Pass 2: tax and discount stay proportional to item subtotal; tip splits
+  // evenly across everyone in the transaction.
+  const allIds = people.map((p) => p.id);
   for (const it of items) {
     if (it.kind === "item") continue;
-    const shares = allocateProportional(it.priceCents, subtotalByPerson);
+    const shares =
+      it.kind === "tip"
+        ? allocate(it.priceCents, allIds, running)
+        : allocateProportional(it.priceCents, subtotalByPerson);
     for (const [pid, share] of shares) {
       const t = totals.get(pid)!;
       t.totalCents += share;
       t.itemBreakdown.push({ itemId: it.id, shareCents: share });
+      running.set(pid, running.get(pid)! + share);
     }
   }
 

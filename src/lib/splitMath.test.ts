@@ -44,7 +44,7 @@ describe("computeSplit — subset assignment", () => {
   });
 });
 
-describe("computeSplit — proportional tax & tip", () => {
+describe("computeSplit — proportional tax, even-split tip", () => {
   it("allocates tax proportionally to each person's item subtotal", () => {
     const ps = people("A", "B");
     const result = computeSplit(
@@ -60,7 +60,7 @@ describe("computeSplit — proportional tax & tip", () => {
     expect(result.totalCents).toBe(3300);
   });
 
-  it("allocates tip the same way as tax", () => {
+  it("splits tip evenly across all people regardless of item subtotal", () => {
     const ps = people("A", "B");
     const result = computeSplit(
       [
@@ -70,8 +70,29 @@ describe("computeSplit — proportional tax & tip", () => {
       ],
       ps
     );
-    expect(result.perPerson[0].totalCents).toBe(2400);
-    expect(result.perPerson[1].totalCents).toBe(1200);
+    // 600 / 2 = 300 each, exact. A and B each pay half the tip even though
+    // A ordered twice as much.
+    expect(result.perPerson[0].totalCents).toBe(2300);
+    expect(result.perPerson[1].totalCents).toBe(1300);
+    expect(result.totalCents).toBe(3600);
+  });
+
+  it("routes the odd tip cent to the person furthest behind", () => {
+    // Three people, one with no items. Tip of 7¢ → base 2, remainder 1.
+    // Cumulative-min sends the +1 to C, who's at 0 after items.
+    const ps = people("A", "B", "C");
+    const result = computeSplit(
+      [
+        { ...item({ id: "i1", priceCents: 500 }), assignedPersonIds: ["p0"] },
+        { ...item({ id: "i2", priceCents: 500 }), assignedPersonIds: ["p1"] },
+        item({ id: "tip", priceCents: 7, kind: "tip" }),
+      ],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(502); // A: 500 + 2
+    expect(result.perPerson[1].totalCents).toBe(502); // B: 500 + 2
+    expect(result.perPerson[2].totalCents).toBe(3);   // C: 0 + 3
+    expect(result.totalCents).toBe(1007);
   });
 });
 
@@ -92,9 +113,9 @@ describe("computeSplit — rounding invariant", () => {
     );
   });
 
-  it("rotates the leftover cent across items so two people split evenly", () => {
-    // Two odd-cent items split 2 ways: without rotation, A would always
-    // collect the +1¢ on both items. With rotation, item 0 → A, item 1 → B.
+  it("balances the leftover cent across items so two people split evenly", () => {
+    // Two odd-cent items split 2 ways. Item 1: tie → A (lower id) gets the +1.
+    // Item 2: A is now ahead, so B gets the +1. Net: both at 349.
     const ps = people("A", "B");
     const result = computeSplit(
       [
@@ -105,6 +126,25 @@ describe("computeSplit — rounding invariant", () => {
     );
     expect(result.perPerson[0].totalCents).toBe(349);
     expect(result.perPerson[1].totalCents).toBe(349);
+  });
+
+  it("sends the leftover cent to the person furthest behind, not by item index", () => {
+    // Item 1 ($1.00, A+B only) leaves C at 0 while A=B=50.
+    // Item 2 ($1.00, all three) has a leftover cent. A rotation-by-index
+    // scheme would give it to A or B; cumulative-min gives it to C, who's
+    // furthest behind.
+    const ps = people("A", "B", "C");
+    const result = computeSplit(
+      [
+        { ...item({ id: "i1", priceCents: 100 }), assignedPersonIds: ["p0", "p1"] },
+        item({ id: "i2", priceCents: 100 }),
+      ],
+      ps
+    );
+    expect(result.perPerson[0].totalCents).toBe(83); // A: 50 + 33
+    expect(result.perPerson[1].totalCents).toBe(83); // B: 50 + 33
+    expect(result.perPerson[2].totalCents).toBe(34); // C: 0 + 34
+    expect(result.totalCents).toBe(200);
   });
 
   it("bounds the imbalance between two people to at most 1 cent across many items", () => {
