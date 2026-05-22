@@ -135,3 +135,46 @@ test("OCR retry: failed scan can be retried", async ({ page }) => {
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByRole("button", { name: "Add row" })).toBeVisible();
 });
+
+test("view receipt button opens the receipt image in a modal", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "New Split" }).click();
+
+  await page.evaluate(() => {
+    (window as any).__scansplit_seed__("r-viewer", {
+      merchant: "Trader Joe's",
+      items: [
+        { raw: "MILK", name: "Milk", priceCents: 349, kind: "item" },
+      ],
+    });
+  });
+
+  // Step 1 -> 2
+  await page.getByRole("button", { name: "Next" }).click();
+  // Step 2 -> 3
+  await page.getByRole("button", { name: "Next" }).click();
+  // Step 3: add one person
+  await page.getByPlaceholder("Name").fill("Alice");
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  // Step 4 -> 5
+  await page.getByRole("button", { name: "Next" }).click();
+
+  // Step 5: Save -> navigates to /transaction/:id
+  await page.getByRole("button", { name: /^Save/ }).click();
+  await page.waitForURL(/\/transaction\/[^/]+$/);
+
+  // View receipt button visible (1 receipt -> singular label).
+  const viewBtn = page.getByRole("button", { name: /^View receipt$/ });
+  await expect(viewBtn).toBeVisible();
+  await viewBtn.click();
+
+  const img = page.getByRole("img", { name: /seed\.jpg/i });
+  await expect(img).toBeVisible();
+  const src = await img.getAttribute("src");
+  expect(src ?? "").toMatch(/^data:image\/jpeg;base64,/);
+
+  // ESC closes.
+  await page.keyboard.press("Escape");
+  await expect(img).not.toBeVisible();
+});
