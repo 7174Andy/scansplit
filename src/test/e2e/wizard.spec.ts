@@ -136,6 +136,52 @@ test("OCR retry: failed scan can be retried", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Add row" })).toBeVisible();
 });
 
+test("payment status: tick checkbox, reload, see settled / partial on home", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "New Split" }).click();
+
+  // Single $30 wine item, three people will split it.
+  await page.evaluate(() => {
+    (window as any).__scansplit_seed__("r-paid", {
+      merchant: null,
+      items: [{ raw: "WINE", name: "Wine", priceCents: 3000, kind: "item" }],
+    });
+  });
+
+  await page.getByRole("button", { name: "Next" }).click(); // 1 -> 2
+  await page.getByRole("button", { name: "Next" }).click(); // 2 -> 3
+  await page.getByPlaceholder("Name").fill("Alice");
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByPlaceholder("Name").fill("Bob");
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByPlaceholder("Name").fill("Cara");
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Next" }).click(); // 3 -> 4
+  await page.getByRole("button", { name: "Next" }).click(); // 4 -> 5
+  await page.getByRole("button", { name: /^Save/ }).click();
+  await page.waitForURL(/\/transaction\/[^/]+$/);
+
+  // On the detail page, tick Alice paid.
+  const aliceBox = page.getByRole("checkbox", { name: /Mark Alice paid/ });
+  await aliceBox.check();
+  await expect(aliceBox).toBeChecked();
+  await expect(page.getByText(/Paid · /).first()).toBeVisible();
+
+  // Navigate home: row shows "1 of 3 paid".
+  await page.getByRole("button", { name: /Home/ }).click();
+  await expect(page.getByText("1 of 3 paid")).toBeVisible();
+
+  // Open the transaction again — persistence through getTransaction.
+  await page.getByRole("link", { name: /Wine|Split/ }).first().click();
+  await expect(page.getByRole("checkbox", { name: /Mark Alice paid/ })).toBeChecked();
+
+  // Tick the remaining two and confirm the home list flips to Settled.
+  await page.getByRole("checkbox", { name: /Mark Bob paid/ }).check();
+  await page.getByRole("checkbox", { name: /Mark Cara paid/ }).check();
+  await page.getByRole("button", { name: /Home/ }).click();
+  await expect(page.getByText("Settled")).toBeVisible();
+});
+
 test("view receipt button opens the receipt image in a modal", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "New Split" }).click();
