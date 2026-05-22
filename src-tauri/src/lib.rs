@@ -21,7 +21,12 @@ pub fn run() {
             let handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
                 let pool = db::open_pool(&db_path).await.expect("open db");
-                handle.manage(AppState { pool });
+                handle.manage(AppState { pool: pool.clone() });
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = db::backfill::backfill_legacy_image_paths(&pool).await {
+                        tracing::warn!("receipt backfill failed: {e}");
+                    }
+                });
             });
             Ok(())
         })
