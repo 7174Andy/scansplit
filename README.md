@@ -1,4 +1,14 @@
+<div align="center">
+
+<img src="site/logo.svg" alt="ScanSplit logo" width="96" height="96" />
+
 # ScanSplit
+
+**Split receipts fairly. Locally.**
+
+[Download for macOS · Windows · Linux →](https://7174andy.github.io/scansplit/)
+
+</div>
 
 A single-user desktop app that turns receipt images into a per-person cost split. Snap or upload one or more receipts, let Claude extract the line items, assign items to people, and ScanSplit produces a fair split with tax, tip, and discounts allocated proportionally.
 
