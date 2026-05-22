@@ -68,7 +68,15 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
       const elapsedMs = Math.round(performance.now() - started);
       useWizardStore.setState((st) => ({
         receipts: st.receipts.map((r) =>
-          r.id === id ? { ...r, imagePath: result.imagePath } : r
+          r.id === id
+            ? {
+                ...r,
+                imagePath: result.imagePath,
+                imageBytesBase64: result.imageBytesBase64,
+                mime: result.mime,
+                byteSize: result.byteSize,
+              }
+            : r
         ),
       }));
       mergeParsed(id, result.parsed);
@@ -83,27 +91,35 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
   const allDone = receipts.length > 0 && receipts.every((r) => scanStatus[r.id] === "ok");
 
   if (import.meta.env.MODE === "test" && typeof window !== "undefined") {
+    const PLACEHOLDER_JPEG_B64 =
+      "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAr/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/wD//2Q==";
     (window as any).__scansplit_seed__ = (receiptId: string, parsed: any) => {
       const id = receiptId;
       addReceipt({
-        id, transactionId: transaction.id, imagePath: "/test/seed.jpg",
+        id, transactionId: transaction.id, imagePath: "seed.jpg",
         position: receipts.length, scannedAt: 0,
-      });
+        imageBytesBase64: PLACEHOLDER_JPEG_B64,
+        mime: "image/jpeg",
+        byteSize: 131,
+      } as any);
       setScanStatus(id, "ok");
       mergeParsed(id, parsed);
     };
     (window as any).__scansplit_seed_error__ = (receiptId: string, message: string) => {
       addReceipt({
-        id: receiptId, transactionId: transaction.id, imagePath: "/test/seed.jpg",
+        id: receiptId, transactionId: transaction.id, imagePath: "seed.jpg",
         position: receipts.length, scannedAt: 0,
       });
       setScanStatus(receiptId, "error", message);
     };
     (window as any).__scansplit_seed_empty__ = (receiptId: string) => {
       addReceipt({
-        id: receiptId, transactionId: transaction.id, imagePath: "/test/seed.jpg",
+        id: receiptId, transactionId: transaction.id, imagePath: "seed.jpg",
         position: receipts.length, scannedAt: 0,
-      });
+        imageBytesBase64: PLACEHOLDER_JPEG_B64,
+        mime: "image/jpeg",
+        byteSize: 131,
+      } as any);
       setScanStatus(receiptId, "ok");
       mergeParsed(receiptId, { merchant: null, items: [] });
     };
