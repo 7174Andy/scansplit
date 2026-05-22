@@ -66,48 +66,48 @@ export default function Settings() {
         ScanSplit uses Claude to read receipts. You'll need an Anthropic API
         key to scan anything — get one at console.anthropic.com.
       </p>
-      <p className="my-2 inline-flex items-center gap-1.5">
-        {hasKey === null ? (
-          <span className="text-muted-foreground">Checking…</span>
-        ) : hasKey ? (
-          <span className="inline-flex items-center gap-1.5 text-success">
+      {hasKey === null ? (
+        <p className="mt-3 text-sm text-muted-foreground">Checking…</p>
+      ) : hasKey ? (
+        <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
+          <span className="inline-flex items-center gap-1.5 text-sm text-success">
             <Check className="size-4" /> Key configured
           </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-            <X className="size-4" /> No key set
-          </span>
-        )}
-      </p>
-
-      <Input
-        type="password"
-        placeholder="sk-ant-…"
-        value={key}
-        onChange={(e) => setKey(e.target.value)}
-        className="mb-2"
-      />
-
-      <div className="flex items-center gap-2">
-        <Button onClick={save} disabled={!key}>
-          <Check className="size-4" /> Save
-        </Button>
-        {hasKey && (
-          <Button variant="destructive" onClick={remove}>
+          <Button variant="destructive" size="sm" onClick={remove}>
             <Trash2 className="size-4" /> Remove key
           </Button>
-        )}
-        {dirty && (
-          <span className="inline-flex items-center gap-1 text-[13px] text-muted-foreground">
-            <Pencil className="size-3.5" /> Unsaved
-          </span>
-        )}
-        {saved && !dirty && (
-          <span className="inline-flex items-center gap-1 text-[13px] text-success">
-            <Check className="size-3.5" /> Saved
-          </span>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          <p className="mt-3 mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            <X className="size-4" /> No key set
+          </p>
+
+          <Input
+            type="password"
+            placeholder="sk-ant-…"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            className="mb-2"
+          />
+
+          <div className="flex items-center gap-2">
+            <Button onClick={save} disabled={!key}>
+              <Check className="size-4" /> Save
+            </Button>
+            {dirty && (
+              <span className="inline-flex items-center gap-1 text-[13px] text-muted-foreground">
+                <Pencil className="size-3.5" /> Unsaved
+              </span>
+            )}
+            {saved && !dirty && (
+              <span className="inline-flex items-center gap-1 text-[13px] text-success">
+                <Check className="size-3.5" /> Saved
+              </span>
+            )}
+          </div>
+        </>
+      )}
       {err && <p className="mt-2 text-destructive">{err}</p>}
     </div>
   );
