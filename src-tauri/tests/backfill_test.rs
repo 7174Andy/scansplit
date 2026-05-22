@@ -111,3 +111,43 @@ async fn backfill_is_idempotent() {
 
     assert_eq!(n1, n2);
 }
+
+#[tokio::test]
+async fn backfill_does_not_touch_already_populated_rows() {
+    let pool = fresh_pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let png = dir.path().join("legacy.png");
+    write_png(&png);
+    insert_tx_and_receipt(&pool, "r-race", png.to_str().unwrap()).await;
+
+    // First run -> populates image_bytes.
+    backfill_legacy_image_paths(&pool).await.unwrap();
+
+    // Manually rewrite image_bytes to simulate "some other writer set it".
+    let manual_bytes: Vec<u8> = (0..16u8).collect();
+    sqlx::query(
+        "UPDATE receipts
+         SET image_bytes = ?, mime = 'image/png', byte_size = ?
+         WHERE id = 'r-race'",
+    )
+    .bind(&manual_bytes)
+    .bind(manual_bytes.len() as i64)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Second run -> must NOT overwrite the manual write.
+    backfill_legacy_image_paths(&pool).await.unwrap();
+
+    let row = sqlx::query(
+        "SELECT image_bytes, mime FROM receipts WHERE id = 'r-race'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let bytes: Vec<u8> = row.get("image_bytes");
+    let mime: String = row.get("mime");
+
+    assert_eq!(bytes, manual_bytes, "backfill must not overwrite existing bytes");
+    assert_eq!(mime, "image/png", "backfill must not overwrite existing mime");
+}

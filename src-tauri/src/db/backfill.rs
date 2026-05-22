@@ -45,7 +45,7 @@ pub async fn backfill_legacy_image_paths(pool: &SqlitePool) -> AppResult<()> {
         sqlx::query(
             "UPDATE receipts
              SET image_bytes = ?, mime = ?, byte_size = ?, image_path = ?
-             WHERE id = ?",
+             WHERE id = ? AND length(image_bytes) = 0",
         )
         .bind(&processed.bytes)
         .bind(processed.mime)
