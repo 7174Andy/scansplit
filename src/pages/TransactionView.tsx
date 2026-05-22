@@ -86,7 +86,7 @@ export default function TransactionView() {
       <Button variant="ghost" onClick={() => navigate("/")}>
         <ArrowLeft className="size-4" /> Home
       </Button>
-      <h1 className="mt-4 text-3xl font-bold">{full.transaction.title}</h1>
+      <h1 className="mt-4 mb-3 text-3xl font-bold">{full.transaction.title}</h1>
       <div className="mb-4 flex gap-2">
         <Button variant="outline" onClick={copy}>
           <CopyIcon className="size-4" /> Copy
