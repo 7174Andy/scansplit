@@ -6,6 +6,7 @@ import { formatCents } from "@/lib/formatCurrency";
 import type { TransactionSummary } from "@/lib/types";
 import { useWizardStore } from "@/store/wizardStore";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/Logo";
 
 export default function Home() {
   const [rows, setRows] = useState<TransactionSummary[] | null>(null);
@@ -20,7 +21,10 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-3xl p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">ScanSplit</h1>
+        <div className="flex items-center gap-3">
+          <Logo className="size-9" />
+          <h1 className="text-3xl font-bold">ScanSplit</h1>
+        </div>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={() => navigate("/settings")}>
             <Cog className="size-4" /> Settings
