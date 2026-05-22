@@ -34,9 +34,14 @@ export function SplitTotalsTable({
         <span>Per-person totals</span>
         <SplitMathHelpDialog />
       </div>
-      <p className="pb-1 text-xs text-muted-foreground/70">
+      <p className="text-xs text-muted-foreground/70">
         Click a name to see how it's calculated.
       </p>
+      {showPaid && (
+        <p className="pb-1 text-xs text-muted-foreground/70">
+          Check the box once someone pays you back.
+        </p>
+      )}
       {split.perPerson.map((p) => {
         const paidAt = showPaid ? paidByPersonId![p.personId] ?? null : null;
         const isPaid = paidAt != null;
