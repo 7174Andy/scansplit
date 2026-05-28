@@ -8,8 +8,37 @@ pub fn is_heic(bytes: &[u8]) -> bool {
     matches!(&bytes[8..12], b"heic" | b"heix" | b"mif1" | b"heif" | b"heim" | b"heis")
 }
 
-pub fn decode_heic_to_image(_bytes: &[u8]) -> AppResult<image::DynamicImage> {
-    Err(AppError::UnsupportedImageFormat("not yet implemented".into()))
+pub fn decode_heic_to_image(bytes: &[u8]) -> AppResult<image::DynamicImage> {
+    use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
+
+    let lib = LibHeif::new();
+    let ctx = HeifContext::read_from_bytes(bytes)
+        .map_err(|e| AppError::UnsupportedImageFormat(format!("heic open: {e}")))?;
+    let handle = ctx
+        .primary_image_handle()
+        .map_err(|e| AppError::UnsupportedImageFormat(format!("heic primary handle: {e}")))?;
+    let decoded = lib
+        .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)
+        .map_err(|e| AppError::UnsupportedImageFormat(format!("heic decode: {e}")))?;
+
+    let planes = decoded.planes();
+    let plane = planes
+        .interleaved
+        .ok_or_else(|| AppError::UnsupportedImageFormat("heic missing interleaved plane".into()))?;
+
+    let width = plane.width;
+    let height = plane.height;
+    let stride = plane.stride;
+    let row_bytes = (width as usize) * 3;
+
+    let mut buf = Vec::with_capacity(row_bytes * height as usize);
+    for y in 0..height as usize {
+        let start = y * stride;
+        buf.extend_from_slice(&plane.data[start..start + row_bytes]);
+    }
+    let rgb = image::RgbImage::from_raw(width, height, buf)
+        .ok_or_else(|| AppError::UnsupportedImageFormat("heic raw buffer size mismatch".into()))?;
+    Ok(image::DynamicImage::ImageRgb8(rgb))
 }
 
 #[cfg(test)]
@@ -50,5 +79,21 @@ mod tests {
     fn is_heic_rejects_unknown_ftyp_brand() {
         assert!(!is_heic(&ftyp(b"mp42")));
         assert!(!is_heic(&ftyp(b"avif")));
+    }
+
+    #[test]
+    fn decode_heic_to_image_returns_expected_dimensions() {
+        let bytes = std::fs::read("tests/fixtures/sample.heic")
+            .expect("fixture sample.heic missing — see Task 2");
+        let img = decode_heic_to_image(&bytes).expect("decode should succeed");
+        // Fixture was generated at 300x200 (see Task 2 Step 3).
+        assert_eq!(img.width(), 300);
+        assert_eq!(img.height(), 200);
+    }
+
+    #[test]
+    fn decode_heic_to_image_rejects_non_heic_bytes() {
+        let r = decode_heic_to_image(&[0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0]);
+        assert!(matches!(r, Err(AppError::UnsupportedImageFormat(_))));
     }
 }
