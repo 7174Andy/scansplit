@@ -16,7 +16,7 @@ interface TauriApi {
   getApiKey: () => Promise<string | null>;
   setApiKey: (key: string) => Promise<void>;
   deleteApiKey: () => Promise<void>;
-  scanReceipt: (sourcePath: string) => Promise<ScanResult>;
+  scanReceipt: (sourcePath: string, receiptId: string) => Promise<ScanResult>;
   recordCodeCorrections: (
     merchant: string | null,
     corrections: Array<[string, string]>
@@ -35,7 +35,8 @@ const realApi: TauriApi = {
   getApiKey: () => invoke<string | null>("get_api_key"),
   setApiKey: (key) => invoke<void>("set_api_key", { key }),
   deleteApiKey: () => invoke<void>("delete_api_key"),
-  scanReceipt: (sourcePath) => invoke<ScanResult>("scan_receipt", { sourcePath }),
+  scanReceipt: (sourcePath, receiptId) =>
+    invoke<ScanResult>("scan_receipt", { sourcePath, receiptId }),
   recordCodeCorrections: (merchant, corrections) =>
     invoke<void>("record_code_corrections", { merchant, corrections }),
   getReceiptImage: (receiptId) =>
@@ -79,7 +80,7 @@ const stubApi: TauriApi = {
   getApiKey: async () => "test-key",
   setApiKey: async () => {},
   deleteApiKey: async () => {},
-  scanReceipt: async () => {
+  scanReceipt: async (_sourcePath, _receiptId) => {
     throw new Error("scan_receipt is not available in test mode; use the window seed hook");
   },
   recordCodeCorrections: async () => {},

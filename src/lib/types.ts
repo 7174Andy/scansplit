@@ -125,3 +125,10 @@ export interface AppErrorPayload {
   code: string;
   message: string;
 }
+
+export type ScanStage = "prepare" | "anthropic" | "finalize";
+
+export interface ScanProgressEvent {
+  receiptId: string;
+  stage: ScanStage;
+}

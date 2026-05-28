@@ -6,6 +6,7 @@ import type {
   ParsedReceipt,
   PersonRecord,
   ReceiptRecord,
+  ScanStage,
   TransactionMeta,
 } from "../lib/types";
 
@@ -15,6 +16,7 @@ interface WizardState {
   transaction: TransactionMeta;
   receipts: ReceiptRecord[];
   scanStatus: Record<string, "pending" | "scanning" | "ok" | "error">;
+  scanStage: Record<string, ScanStage>;
   scanErrors: Record<string, string>;
   items: ItemRecord[];
   people: PersonRecord[];
@@ -28,6 +30,7 @@ interface WizardState {
 
   addReceipt: (r: ReceiptRecord) => void;
   setScanStatus: (id: string, status: WizardState["scanStatus"][string], err?: string) => void;
+  setScanStage: (id: string, stage: ScanStage) => void;
   mergeParsed: (receiptId: string, parsed: ParsedReceipt) => void;
   removeReceipt: (id: string) => void;
 
@@ -70,6 +73,7 @@ export const useWizardStore = create<WizardState>()(
       transaction: emptyMeta(),
       receipts: [],
       scanStatus: {},
+      scanStage: {},
       scanErrors: {},
       items: [],
       people: [],
@@ -81,6 +85,7 @@ export const useWizardStore = create<WizardState>()(
         transaction: emptyMeta(id),
         receipts: [],
         scanStatus: {},
+        scanStage: {},
         scanErrors: {},
         items: [],
         people: [],
@@ -93,6 +98,7 @@ export const useWizardStore = create<WizardState>()(
         transaction: full.transaction,
         receipts: full.receipts,
         scanStatus: Object.fromEntries(full.receipts.map((r) => [r.id, "ok"])),
+        scanStage: {},
         scanErrors: {},
         items: full.items,
         people: full.people,
@@ -108,9 +114,22 @@ export const useWizardStore = create<WizardState>()(
         scanStatus: { ...st.scanStatus, [r.id]: "pending" },
       })),
 
-      setScanStatus: (id, status, err) => set((st) => ({
-        scanStatus: { ...st.scanStatus, [id]: status },
-        scanErrors: err ? { ...st.scanErrors, [id]: err } : st.scanErrors,
+      setScanStatus: (id, status, err) => set((st) => {
+        const isTerminal = status === "ok" || status === "error";
+        let nextStage = st.scanStage;
+        if (isTerminal && st.scanStage[id] !== undefined) {
+          const { [id]: _stage, ...rest } = st.scanStage;
+          nextStage = rest;
+        }
+        return {
+          scanStatus: { ...st.scanStatus, [id]: status },
+          scanStage: nextStage,
+          scanErrors: err ? { ...st.scanErrors, [id]: err } : st.scanErrors,
+        };
+      }),
+
+      setScanStage: (id, stage) => set((st) => ({
+        scanStage: { ...st.scanStage, [id]: stage },
       })),
 
       mergeParsed: (receiptId, parsed) => set((st) => {
@@ -133,12 +152,14 @@ export const useWizardStore = create<WizardState>()(
       }),
 
       removeReceipt: (id) => set((st) => {
-        const { [id]: _, ...remStatus } = st.scanStatus;
-        const { [id]: __, ...remErrors } = st.scanErrors;
+        const { [id]: _status, ...remStatus } = st.scanStatus;
+        const { [id]: _err, ...remErrors } = st.scanErrors;
+        const { [id]: _stage, ...remStage } = st.scanStage;
         return {
           receipts: st.receipts.filter((r) => r.id !== id),
           items: st.items.filter((i) => i.receiptId !== id),
           scanStatus: remStatus,
+          scanStage: remStage,
           scanErrors: remErrors,
         };
       }),

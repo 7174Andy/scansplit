@@ -1,17 +1,26 @@
 import { Receipt, Check, AlertCircle, X } from "lucide-react";
-import type { ReceiptRecord } from "@/lib/types";
+import type { ReceiptRecord, ScanStage } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ScanProgressRing } from "@/components/ScanProgressRing";
 
 interface Props {
   receipt: ReceiptRecord;
   status: "pending" | "scanning" | "ok" | "error";
+  stage?: ScanStage;
   onRemove: () => void;
   onErrorClick?: () => void;
 }
 
-export function ReceiptThumbnail({ receipt, status, onRemove, onErrorClick }: Props) {
+const STAGE_LABEL: Record<ScanStage, string> = {
+  prepare: "Preparing…",
+  anthropic: "Analyzing receipt…",
+  finalize: "Finalizing…",
+};
+
+export function ReceiptThumbnail({ receipt, status, stage, onRemove, onErrorClick }: Props) {
   const clickable = status === "error" && !!onErrorClick;
+  const scanning = status === "scanning";
   return (
     <div
       role={clickable ? "button" : undefined}
@@ -38,8 +47,10 @@ export function ReceiptThumbnail({ receipt, status, onRemove, onErrorClick }: Pr
       <div className="break-all text-center text-[11px] text-muted-foreground">
         {receipt.imagePath.split("/").pop()}
       </div>
-      {status === "scanning" && (
-        <div className="text-xs text-muted-foreground">scanning…</div>
+      {scanning && (
+        <div className="text-xs text-muted-foreground">
+          {STAGE_LABEL[stage ?? "prepare"]}
+        </div>
       )}
       {status === "ok" && (
         <div className="inline-flex items-center gap-1 text-xs text-success">
@@ -51,17 +62,24 @@ export function ReceiptThumbnail({ receipt, status, onRemove, onErrorClick }: Pr
           <AlertCircle className="size-3" /> error
         </div>
       )}
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Remove receipt"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-      >
-        <X className="size-3.5" />
-      </Button>
+      {scanning ? (
+        <ScanProgressRing
+          stage={stage ?? "prepare"}
+          onRemove={onRemove}
+        />
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Remove receipt"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          <X className="size-3.5" />
+        </Button>
+      )}
     </div>
   );
 }

@@ -224,3 +224,38 @@ test("view receipt button opens the receipt image in a modal", async ({ page }) 
   await page.keyboard.press("Escape");
   await expect(img).not.toBeVisible();
 });
+
+test("scan progress ring snaps through stages", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "New Split" }).click();
+
+  // Seed the scanning state at stage "prepare".
+  await page.evaluate(() =>
+    (window as any).__scansplit_seed_scanning__("r-ring-1", "prepare"),
+  );
+
+  const SIZE = 32;
+  const STROKE = 3;
+  const RADIUS = (SIZE - STROKE) / 2;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const offsetFor = (fraction: number) =>
+    (CIRCUMFERENCE * (1 - fraction)).toFixed(3);
+
+  const arc = page.getByTestId("scan-progress-arc");
+  await expect(arc).toHaveAttribute("stroke-dashoffset", offsetFor(0.25));
+  await expect(page.getByText("Preparing…")).toBeVisible();
+
+  // Transition to "anthropic".
+  await page.evaluate(() =>
+    (window as any).__scansplit_seed_scanning__("r-ring-1", "anthropic"),
+  );
+  await expect(arc).toHaveAttribute("stroke-dashoffset", offsetFor(0.75));
+  await expect(page.getByText("Analyzing receipt…")).toBeVisible();
+
+  // Transition to "finalize".
+  await page.evaluate(() =>
+    (window as any).__scansplit_seed_scanning__("r-ring-1", "finalize"),
+  );
+  await expect(arc).toHaveAttribute("stroke-dashoffset", offsetFor(1));
+  await expect(page.getByText("Finalizing…")).toBeVisible();
+});
