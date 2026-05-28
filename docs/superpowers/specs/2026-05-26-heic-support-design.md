@@ -105,6 +105,11 @@ The crate links against the system `libheif` C library; it does not vendor it. I
 
 On macOS and Linux, `libheif` is dynamically linked. The Tauri bundle on macOS must include `libheif.dylib` and its transitive deps (`libde265`, `x265`) via `tauri.conf.json` `bundle.macOS.frameworks` (or `resources`) so end users without Homebrew can run the app. On Windows the `vcpkg` static-MD triplet links the C++ runtime dynamically but `libheif` itself statically, so no extra DLL bundling is needed.
 
+**Deferred (2026-05-26):** macOS dylib bundling is not implemented. The release `.app` bundle's binary has a hard-coded reference to `/opt/homebrew/opt/libheif/lib/libheif.1.dylib`, so:
+- Local builds work on any Mac with `brew install libheif`.
+- A `.dmg` shipped to an end user without brew libheif will fail with a `dyld` error when they import a HEIC.
+- For the current single-user use case this is acceptable. Proper bundling (e.g. `dylibbundler` + `install_name_tool`, or enabling `libheif-rs/compile-libheif` with codec dep installs at build time) should be added before broader distribution.
+
 ## CI / Release changes
 
 ### `.github/workflows/ci.yml` — `rust` job
