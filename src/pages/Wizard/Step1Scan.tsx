@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import { useWizardStore } from "../../store/wizardStore";
 import { ReceiptThumbnail } from "../../components/ReceiptThumbnail";
 import { ScanErrorDialog } from "../../components/ScanErrorDialog";
 import { api } from "../../lib/tauri";
 import { Plus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { ScanProgressEvent } from "../../lib/types";
 
 function newId(): string {
   return crypto.randomUUID();
@@ -37,6 +39,17 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
     }
     prevErrorIds.current = currentErrors;
   }, [scanStatus, receipts]);
+
+  useEffect(() => {
+    if (import.meta.env.MODE === "test") return;
+    let unlisten: (() => void) | undefined;
+    listen<ScanProgressEvent>("scan-progress", (e) => {
+      setScanStage(e.payload.receiptId, e.payload.stage);
+    })
+      .then((fn) => { unlisten = fn; })
+      .catch((err) => { console.warn("scan-progress listen failed:", err); });
+    return () => { unlisten?.(); };
+  }, [setScanStage]);
 
   async function pickFiles() {
     setPicking(true);
