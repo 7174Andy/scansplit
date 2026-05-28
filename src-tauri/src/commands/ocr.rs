@@ -9,17 +9,22 @@ use tauri::State;
 
 #[tauri::command]
 pub async fn scan_receipt(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     source_path: String,
+    receipt_id: String,
 ) -> AppResult<ScanResult> {
     let key = crate::commands::settings::read_api_key()?
         .ok_or(AppError::MissingApiKey)?;
     let scanner: Box<dyn Scanner> = Box::new(ClaudeScanner::new(key));
 
     let bytes = std::fs::read(&source_path)?;
+    let (prepared, media_type) = crate::ocr::claude::prepare_image(&bytes)?;
+    emit_progress(&app, &receipt_id, "anthropic");
 
-    // Use full-resolution bytes for OCR; downsize only for storage.
-    let mut parsed: ParsedReceipt = scanner.scan(&bytes).await?;
+    let mut parsed: ParsedReceipt = scanner.scan_prepared(&prepared, media_type).await?;
+    emit_progress(&app, &receipt_id, "finalize");
+
     code_expansions::apply_learned(&state.pool, &mut parsed).await?;
 
     let processed = process_for_storage(&bytes)?;
@@ -58,4 +63,12 @@ pub async fn record_code_corrections(
     corrections: Vec<(String, String)>,
 ) -> AppResult<()> {
     code_expansions::record_corrections(&state.pool, merchant.as_deref(), &corrections).await
+}
+
+fn emit_progress(app: &tauri::AppHandle, receipt_id: &str, stage: &str) {
+    use tauri::Emitter;
+    let _ = app.emit("scan-progress", serde_json::json!({
+        "receiptId": receipt_id,
+        "stage": stage,
+    }));
 }

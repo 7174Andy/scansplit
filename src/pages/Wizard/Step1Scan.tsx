@@ -65,7 +65,7 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
     setScanStage(id, "prepare");
     try {
       const started = performance.now();
-      const result = await api.scanReceipt(sourcePath);
+      const result = await api.scanReceipt(sourcePath, id);
       const elapsedMs = Math.round(performance.now() - started);
       useWizardStore.setState((st) => ({
         receipts: st.receipts.map((r) =>
