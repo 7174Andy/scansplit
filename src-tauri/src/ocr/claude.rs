@@ -56,9 +56,12 @@ struct AnthropicBlock {
 
 #[async_trait::async_trait]
 impl Scanner for ClaudeScanner {
-    async fn scan(&self, image_bytes: &[u8]) -> AppResult<ParsedReceipt> {
-        let (prepared, media_type) = prepare_image(image_bytes)?;
-        let b64 = B64.encode(&prepared);
+    async fn scan_prepared(
+        &self,
+        prepared_bytes: &[u8],
+        media_type: &'static str,
+    ) -> AppResult<ParsedReceipt> {
+        let b64 = B64.encode(prepared_bytes);
         let body = json!({
             "model": self.model,
             "max_tokens": 2048,
