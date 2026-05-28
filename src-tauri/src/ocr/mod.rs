@@ -1,5 +1,6 @@
 pub mod claude;
 pub mod code_expansions;
+pub mod heic;
 pub mod image_processing;
 
 use serde::{Deserialize, Serialize};

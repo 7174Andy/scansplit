@@ -12,12 +12,16 @@ pub struct ProcessedImage {
 }
 
 pub fn process_for_storage(source: &[u8]) -> AppResult<ProcessedImage> {
-    let reader = ImageReader::new(Cursor::new(source))
-        .with_guessed_format()
-        .map_err(|e| AppError::UnsupportedImageFormat(e.to_string()))?;
-    let img = reader
-        .decode()
-        .map_err(|e| AppError::UnsupportedImageFormat(e.to_string()))?;
+    let img = if super::heic::is_heic(source) {
+        super::heic::decode_heic_to_image(source)?
+    } else {
+        let reader = ImageReader::new(Cursor::new(source))
+            .with_guessed_format()
+            .map_err(|e| AppError::UnsupportedImageFormat(e.to_string()))?;
+        reader
+            .decode()
+            .map_err(|e| AppError::UnsupportedImageFormat(e.to_string()))?
+    };
 
     let (w, h) = (img.width(), img.height());
     let resized = if w.max(h) > MAX_EDGE {
@@ -49,4 +53,18 @@ pub fn process_for_storage(source: &[u8]) -> AppResult<ProcessedImage> {
         bytes: out,
         mime: "image/jpeg",
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn process_for_storage_converts_heic_to_jpeg() {
+        let bytes = std::fs::read("tests/fixtures/sample.heic")
+            .expect("fixture sample.heic missing — see plan Task 2");
+        let out = process_for_storage(&bytes).expect("HEIC should be accepted");
+        assert_eq!(out.mime, "image/jpeg");
+        assert_eq!(&out.bytes[..3], &[0xFF, 0xD8, 0xFF]);
+    }
 }

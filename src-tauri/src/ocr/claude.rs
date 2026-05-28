@@ -111,6 +111,22 @@ const MAX_EDGE: u32 = 1568;
 const JPEG_QUALITY: u8 = 85;
 
 pub fn prepare_image(bytes: &[u8]) -> AppResult<(Vec<u8>, &'static str)> {
+    if super::heic::is_heic(bytes) {
+        let img = super::heic::decode_heic_to_image(bytes)?;
+        let needs_resize = img.width() > MAX_EDGE || img.height() > MAX_EDGE;
+        let img = if needs_resize {
+            img.resize(MAX_EDGE, MAX_EDGE, image::imageops::FilterType::Triangle)
+        } else {
+            img
+        };
+        let mut out = Vec::new();
+        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY);
+        img.into_rgb8()
+            .write_with_encoder(encoder)
+            .map_err(|e| AppError::Other(format!("could not encode image: {e}")))?;
+        return Ok((out, "image/jpeg"));
+    }
+
     let media_type = detect_media_type(bytes)?;
 
     let img = image::load_from_memory(bytes)
@@ -148,11 +164,6 @@ pub fn detect_media_type(bytes: &[u8]) -> AppResult<&'static str> {
     } else if bytes.starts_with(b"%PDF-") {
         Err(AppError::UnsupportedImageFormat(
             "PDF receipts are not yet supported".into(),
-        ))
-    } else if bytes.len() >= 12 && &bytes[4..8] == b"ftyp" {
-        // ISO BMFF container — HEIC/HEIF/AVIF live here.
-        Err(AppError::UnsupportedImageFormat(
-            "HEIC/HEIF receipts are not yet supported — convert to JPEG or PNG".into(),
         ))
     } else {
         Err(AppError::UnsupportedImageFormat(
@@ -243,11 +254,14 @@ mod tests {
     }
 
     #[test]
-    fn detect_media_type_heic_returns_unsupported() {
-        let mut heic = vec![0x00, 0x00, 0x00, 0x20];
-        heic.extend_from_slice(b"ftypheic");
-        let r = detect_media_type(&heic);
-        assert!(matches!(r, Err(crate::error::AppError::UnsupportedImageFormat(_))));
+    fn prepare_image_converts_heic_to_jpeg() {
+        let bytes = std::fs::read("tests/fixtures/sample.heic")
+            .expect("fixture sample.heic missing — see plan Task 2");
+        let (out, mime) = prepare_image(&bytes).expect("HEIC should be accepted");
+        assert_eq!(mime, "image/jpeg");
+        // JPEG SOI marker.
+        assert_eq!(&out[..3], &[0xFF, 0xD8, 0xFF]);
+        assert!(!out.is_empty());
     }
 
     #[test]
