@@ -27,18 +27,18 @@ No accounts. No server. The only outbound network call is to `api.anthropic.com`
 
 ## Tech Stack
 
-| Layer | Tech |
-| --- | --- |
-| Shell | [Tauri 2](https://v2.tauri.app/) (Rust + system webview) |
-| Frontend | React 18 + TypeScript, [Zustand](https://github.com/pmndrs/zustand) (with `sessionStorage` persist), React Router v6 |
-| UI | Tailwind CSS, [shadcn/ui](https://ui.shadcn.com/) (new-york style, slate base), [lucide-react](https://lucide.dev/) icons |
-| Build / dev server | Vite 5 (port 1420, `strictPort: true`) |
-| Backend | Rust, async via Tokio, HTTP via `reqwest` (rustls), JSON via `serde` |
-| Database | SQLite via `sqlx` 0.8 with compile-time migrations |
-| Secret storage | OS keychain via the `keyring` crate (Apple Keychain / Windows Credential Manager / Secret Service) |
-| Image handling | `image` crate (JPEG/PNG/GIF/WebP), `base64` for transport |
-| Testing | Vitest + jsdom (frontend unit), Playwright (E2E), `cargo test` (Rust unit + integration) |
-| Package manager | pnpm |
+| Layer              | Tech                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Shell              | [Tauri 2](https://v2.tauri.app/) (Rust + system webview)                                                                  |
+| Frontend           | React 18 + TypeScript, [Zustand](https://github.com/pmndrs/zustand) (with `sessionStorage` persist), React Router v6      |
+| UI                 | Tailwind CSS, [shadcn/ui](https://ui.shadcn.com/) (new-york style, slate base), [lucide-react](https://lucide.dev/) icons |
+| Build / dev server | Vite 5 (port 1420, `strictPort: true`)                                                                                    |
+| Backend            | Rust, async via Tokio, HTTP via `reqwest` (rustls), JSON via `serde`                                                      |
+| Database           | SQLite via `sqlx` 0.8 with compile-time migrations                                                                        |
+| Secret storage     | OS keychain via the `keyring` crate (Apple Keychain / Windows Credential Manager / Secret Service)                        |
+| Image handling     | `image` crate (JPEG/PNG/GIF/WebP), `base64` for transport                                                                 |
+| Testing            | Vitest + jsdom (frontend unit), Playwright (E2E), `cargo test` (Rust unit + integration)                                  |
+| Package manager    | pnpm                                                                                                                      |
 
 ## Getting Started
 
@@ -57,18 +57,18 @@ pnpm install
 
 ### Run
 
-| Task | Command |
-| --- | --- |
-| Run the desktop app (dev) | `pnpm tauri:dev` |
-| Build a distributable bundle | `pnpm tauri:build` |
-| Vite-only (browser, no Tauri — IPC calls fail) | `pnpm dev` |
-| Vite in **test mode** (stubs the Tauri bridge) | `pnpm dev:test` |
-| Frontend unit tests | `pnpm test` |
-| Watch unit tests | `pnpm test:watch` |
-| Single unit test | `pnpm test -- src/lib/splitMath.test.ts` |
-| E2E tests (Playwright, auto-starts `dev:test`) | `pnpm e2e` |
-| Rust unit + integration tests | `cd src-tauri && cargo test` |
-| Typecheck + frontend build | `pnpm build` |
+| Task                                           | Command                                  |
+| ---------------------------------------------- | ---------------------------------------- |
+| Run the desktop app (dev)                      | `pnpm tauri:dev`                         |
+| Build a distributable bundle                   | `pnpm tauri:build`                       |
+| Vite-only (browser, no Tauri — IPC calls fail) | `pnpm dev`                               |
+| Vite in **test mode** (stubs the Tauri bridge) | `pnpm dev:test`                          |
+| Frontend unit tests                            | `pnpm test`                              |
+| Watch unit tests                               | `pnpm test:watch`                        |
+| Single unit test                               | `pnpm test -- src/lib/splitMath.test.ts` |
+| E2E tests (Playwright, auto-starts `dev:test`) | `pnpm e2e`                               |
+| Rust unit + integration tests                  | `cd src-tauri && cargo test`             |
+| Typecheck + frontend build                     | `pnpm build`                             |
 
 The Tauri shell drives Vite via `beforeDevCommand`, so use `tauri:dev` for real app development. `pnpm dev` alone only serves the frontend in a browser, where `@tauri-apps/api` calls will fail unless you use the test-mode stubs.
 
@@ -112,38 +112,12 @@ The split between Rust and the frontend is intentional and load-bearing:
 
 Migrations are append-only files in `src-tauri/migrations/`, run automatically by `sqlx::migrate!` on startup. Tables: `transactions`, `transaction_people`, `receipts`, `items`, `item_assignments`, `code_expansions`. Foreign keys are enabled. `items.kind` is constrained to `'item' | 'tax' | 'tip' | 'discount'`. Prices are integer cents; discounts use negative values.
 
-### Test-Mode Seam
-
-Playwright cannot call the real `scan_receipt`. `Step1Scan` registers three `window` hooks **only when `import.meta.env.MODE === "test"`**:
-
-- `__scansplit_seed__(receiptId, parsed)` — inject a successful scan.
-- `__scansplit_seed_error__(receiptId, message)` — simulate a failed scan.
-- `__scansplit_seed_empty__(receiptId)` — empty receipt for the "user adds items by hand" flow.
-
-If you add another OCR path, add a matching seed hook or E2E tests can't reach it.
-
-## API Key Handling
-
-ScanSplit treats the Anthropic API key as a secret that never crosses the IPC bridge to the renderer:
-
-- The key is stored in the **OS keychain** via the [`keyring`](https://crates.io/crates/keyring) crate — Apple Keychain on macOS, Credential Manager on Windows, Secret Service on Linux.
-- Service name: `"ScanSplit"`. Account: `"anthropic_api_key"`.
-- It is **never** written to SQLite, the filesystem, or any log.
-- The frontend Settings page only knows whether a key is set (`has_api_key()`); it never reads the value back.
-- When the OCR command runs, Rust reads the key from the keychain, sends it directly to `api.anthropic.com` over TLS, and drops it. The renderer process never sees the key bytes.
-
-If the key is missing or invalid, the frontend receives a stable error code (`MISSING_API_KEY` / `INVALID_API_KEY`) and prompts you to update it in Settings.
-
 ## Conventions
 
 - **Money is always integer cents.** Never `number` dollars in shared types or DB; convert at the input/display boundary (`formatCurrency.ts`).
 - **Bridge wire format is camelCase.** Rust structs that cross the bridge use `#[serde(rename_all = "camelCase")]`; frontend types match.
 - **Empty `assignedPersonIds` means "everyone"** at split time. Don't pre-fill with all person IDs.
 - **TypeScript is strict** with `noUnusedLocals` / `noUnusedParameters` — prefix unused vars with `_` or remove them.
-
-## CI
-
-`.github/workflows/ci.yml` runs three jobs on PRs to `main`: `frontend` (`pnpm test`), `rust` (`cargo test` with GTK/WebKit deps installed), and `e2e` (Playwright with chromium). All three must pass.
 
 ## License
 
