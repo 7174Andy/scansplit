@@ -13,8 +13,8 @@ function newId(): string {
 
 export function Step1Scan({ onNext }: { onNext: () => void }) {
   const {
-    transaction, receipts, scanStatus, scanErrors,
-    addReceipt, setScanStatus, mergeParsed, removeReceipt,
+    transaction, receipts, scanStatus, scanStage, scanErrors,
+    addReceipt, setScanStatus, setScanStage, mergeParsed, removeReceipt,
   } = useWizardStore();
 
   const [picking, setPicking] = useState(false);
@@ -62,6 +62,7 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
 
   async function scanOne(id: string, sourcePath: string) {
     setScanStatus(id, "scanning");
+    setScanStage(id, "prepare");
     try {
       const started = performance.now();
       const result = await api.scanReceipt(sourcePath);
@@ -123,6 +124,22 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
       setScanStatus(receiptId, "ok");
       mergeParsed(receiptId, { merchant: null, items: [] });
     };
+    (window as any).__scansplit_seed_scanning__ = (
+      receiptId: string,
+      stage: "prepare" | "anthropic" | "finalize",
+    ) => {
+      // Idempotent: the E2E test calls this multiple times for the same
+      // receipt to walk through stages without producing duplicate thumbnails.
+      const exists = useWizardStore.getState().receipts.some((r) => r.id === receiptId);
+      if (!exists) {
+        addReceipt({
+          id: receiptId, transactionId: transaction.id, imagePath: "seed.jpg",
+          position: receipts.length, scannedAt: 0,
+        });
+      }
+      setScanStatus(receiptId, "scanning");
+      setScanStage(receiptId, stage);
+    };
   }
 
   const activeErrorReceipt = errorDialog
@@ -144,6 +161,7 @@ export function Step1Scan({ onNext }: { onNext: () => void }) {
             <ReceiptThumbnail
               receipt={r}
               status={scanStatus[r.id] ?? "pending"}
+              stage={scanStage[r.id]}
               onRemove={() => removeReceipt(r.id)}
               onErrorClick={() => setErrorDialog({ receiptId: r.id })}
             />
