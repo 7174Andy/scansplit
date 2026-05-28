@@ -247,7 +247,6 @@ test("scan progress ring snaps through stages", async ({ page }) => {
 
   // Transition to "anthropic".
   await page.evaluate(() =>
-    (window as any).__scansplit_seed_scanning__ &&
     (window as any).__scansplit_seed_scanning__("r-ring-1", "anthropic"),
   );
   await expect(arc).toHaveAttribute("stroke-dashoffset", offsetFor(0.75));
