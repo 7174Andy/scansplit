@@ -96,4 +96,16 @@ mod tests {
         let r = decode_heic_to_image(&[0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0]);
         assert!(matches!(r, Err(AppError::UnsupportedImageFormat(_))));
     }
+
+    #[test]
+    fn decode_heic_to_image_honors_rotation_metadata() {
+        // Fixture's stored pixels are 300x200 with an irot (90° cw / 270° ccw)
+        // box. iPhone portrait photos use this same mechanism, so libheif must
+        // apply the transform — otherwise users see sideways receipts.
+        let bytes = std::fs::read("tests/fixtures/sample_rotated.heic")
+            .expect("fixture sample_rotated.heic missing");
+        let img = decode_heic_to_image(&bytes).expect("decode should succeed");
+        assert_eq!(img.width(), 200, "expected post-rotation width");
+        assert_eq!(img.height(), 300, "expected post-rotation height");
+    }
 }
