@@ -62,7 +62,7 @@ interface Props {
 }
 ```
 
-- SVG circle (~28-32 px diameter) with two concentric arcs: a faint background ring (`muted` token) and a foreground arc (`primary` token) whose `stroke-dashoffset` is computed from `stage`:
+- SVG circle (32 px diameter, 3 px stroke) with two concentric arcs: a faint background ring (`muted` token) and a foreground arc (`primary` token) whose `stroke-dashoffset` is computed from `stage`:
   - `prepare` → 25%
   - `anthropic` → 75%
   - `finalize` → 100%
@@ -180,11 +180,11 @@ pub trait Scanner {
 }
 ```
 
-`ClaudeScanner::scan` is removed; its body (everything after `prepare_image`) becomes `ClaudeScanner::scan_prepared`. Existing test fakes that implement `scan` directly need to be migrated to implement `scan_prepared` instead — they currently bypass `prepare_image` anyway, so this is a rename.
+`ClaudeScanner::scan` is removed; its body (everything after `prepare_image`) becomes `ClaudeScanner::scan_prepared`. `ClaudeScanner` is currently the only `impl Scanner` in the codebase, so no other implementations need migration.
 
 ### Tauri capabilities
 
-Verify the existing capabilities in `src-tauri/capabilities/` permit `core:event:listen` (or whatever the v2 permission name is). Add it if missing.
+The existing `src-tauri/capabilities/default.json` already grants `core:default`, which in Tauri v2 includes the event listen/emit permissions. No capability changes are needed.
 
 ## Error handling
 
