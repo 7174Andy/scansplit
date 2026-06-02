@@ -183,7 +183,8 @@ pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResul
 
 pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction> {
     let row = sqlx::query(
-        "SELECT id, title, currency, created_at, updated_at FROM transactions WHERE id = ?",
+        "SELECT id, title, currency, created_at, updated_at, paid_by_person_id
+         FROM transactions WHERE id = ?",
     )
     .bind(id).fetch_optional(pool).await?;
     let row = row.ok_or(crate::error::AppError::NotFound)?;
@@ -193,7 +194,7 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
         currency: row.get("currency"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
-        paid_by_person_id: None, // TODO(Task 3): read from DB
+        paid_by_person_id: row.get("paid_by_person_id"),
     };
 
     let people: Vec<Person> = sqlx::query(

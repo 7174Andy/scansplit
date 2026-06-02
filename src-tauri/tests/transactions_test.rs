@@ -22,6 +22,7 @@ fn sample_full(id: &str) -> FullTransaction {
             currency: "USD".into(),
             created_at: 1,
             updated_at: 1,
+            paid_by_person_id: None,
         },
         people: vec![
             Person { id: "p1".into(), transaction_id: id.into(), name: "Alice".into(), position: 0, paid_at: None },
@@ -268,4 +269,13 @@ async fn replace_full_overwrites_when_payload_includes_bytes() {
     )
     .fetch_one(&pool).await.unwrap().get("n");
     assert_eq!(n, 3);
+}
+
+#[tokio::test]
+async fn get_full_returns_null_payer_for_freshly_inserted_row() {
+    let pool = fresh_pool().await;
+    let f = sample_full("t-payer-null");
+    queries::insert_full(&pool, &f).await.unwrap();
+    let got = queries::get_full(&pool, "t-payer-null").await.unwrap();
+    assert_eq!(got.transaction.paid_by_person_id, None);
 }
