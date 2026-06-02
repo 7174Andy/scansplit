@@ -21,6 +21,12 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
         decoded.push((idx, bytes));
     }
 
+    if let Some(ref pid) = full.transaction.paid_by_person_id {
+        if !full.people.iter().any(|p| &p.id == pid) {
+            return Err(crate::error::AppError::InvalidPayer);
+        }
+    }
+
     let mut tx = pool.begin().await?;
 
     sqlx::query(
@@ -76,6 +82,14 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
             )
             .bind(&it.id).bind(pid).execute(&mut *tx).await?;
         }
+    }
+
+    if let Some(ref pid) = full.transaction.paid_by_person_id {
+        sqlx::query("UPDATE transactions SET paid_by_person_id = ? WHERE id = ?")
+            .bind(pid)
+            .bind(&full.transaction.id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     tx.commit().await?;

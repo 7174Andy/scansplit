@@ -279,3 +279,22 @@ async fn get_full_returns_null_payer_for_freshly_inserted_row() {
     let got = queries::get_full(&pool, "t-payer-null").await.unwrap();
     assert_eq!(got.transaction.paid_by_person_id, None);
 }
+
+#[tokio::test]
+async fn insert_full_persists_payer() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-payer-1");
+    f.transaction.paid_by_person_id = Some("p1".into());
+    queries::insert_full(&pool, &f).await.unwrap();
+    let got = queries::get_full(&pool, "t-payer-1").await.unwrap();
+    assert_eq!(got.transaction.paid_by_person_id, Some("p1".into()));
+}
+
+#[tokio::test]
+async fn insert_full_rejects_unknown_payer() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-payer-bad");
+    f.transaction.paid_by_person_id = Some("not-a-person".into());
+    let err = queries::insert_full(&pool, &f).await.unwrap_err();
+    assert!(matches!(err, scansplit_lib::error::AppError::InvalidPayer));
+}
