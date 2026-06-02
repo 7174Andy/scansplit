@@ -25,9 +25,6 @@ async fn receipts_table_has_blob_columns() {
 
 #[tokio::test]
 async fn migration_0004_adds_paid_by_person_id_column() {
-    use sqlx::sqlite::SqlitePoolOptions;
-    use sqlx::Row;
-
     let pool = SqlitePoolOptions::new()
         .connect("sqlite::memory:")
         .await
