@@ -193,6 +193,7 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
         currency: row.get("currency"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
+        paid_by_person_id: None, // TODO(Task 3): read from DB
     };
 
     let people: Vec<Person> = sqlx::query(
