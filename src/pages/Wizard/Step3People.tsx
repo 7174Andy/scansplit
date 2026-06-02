@@ -46,10 +46,9 @@ export function Step3People({ onBack, onNext }: { onBack: () => void; onNext: ()
         <label className="mt-4 flex items-center gap-2 text-sm">
           <span>Paid by</span>
           <select
-            aria-label="Paid by"
             value={paidByPersonId ?? ""}
             onChange={(e) => setPayer(e.target.value || null)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+            className="rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             {paidByPersonId == null && <option value="">— Select —</option>}
             {people.map((p) => (
