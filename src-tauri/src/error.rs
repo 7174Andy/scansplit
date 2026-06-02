@@ -35,6 +35,9 @@ pub enum AppError {
     #[error("not found")]
     NotFound,
 
+    #[error("payer is not a person on this transaction")]
+    InvalidPayer,
+
     #[error("{0}")]
     Other(String),
 }
@@ -62,6 +65,7 @@ fn error_code(e: &AppError) -> &'static str {
         AppError::OcrParse(_) => "OCR_PARSE",
         AppError::UnsupportedImageFormat(_) => "UNSUPPORTED_IMAGE_FORMAT",
         AppError::NotFound => "NOT_FOUND",
+        AppError::InvalidPayer => "INVALID_PAYER",
         AppError::Other(_) => "OTHER",
     }
 }
