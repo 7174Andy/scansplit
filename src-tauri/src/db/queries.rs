@@ -3,6 +3,15 @@ use crate::db::models::{FullTransaction, Item, Person, Receipt, Transaction};
 use crate::error::AppResult;
 use sqlx::{Row, SqlitePool};
 
+fn validate_payer(full: &FullTransaction) -> AppResult<()> {
+    if let Some(ref pid) = full.transaction.paid_by_person_id {
+        if !full.people.iter().any(|p| &p.id == pid) {
+            return Err(crate::error::AppError::InvalidPayer);
+        }
+    }
+    Ok(())
+}
+
 pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
     // Decode + validate bytes for every receipt before opening the tx, so we
     // never half-write a transaction whose payload was invalid.
@@ -21,11 +30,7 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
         decoded.push((idx, bytes));
     }
 
-    if let Some(ref pid) = full.transaction.paid_by_person_id {
-        if !full.people.iter().any(|p| &p.id == pid) {
-            return Err(crate::error::AppError::InvalidPayer);
-        }
-    }
+    validate_payer(full)?;
 
     let mut tx = pool.begin().await?;
 
@@ -97,11 +102,7 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
 }
 
 pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
-    if let Some(ref pid) = full.transaction.paid_by_person_id {
-        if !full.people.iter().any(|p| &p.id == pid) {
-            return Err(crate::error::AppError::InvalidPayer);
-        }
-    }
+    validate_payer(full)?;
 
     // Snapshot existing receipt bytes so payloads that omit bytes (the edit
     // flow) preserve the original blob.
