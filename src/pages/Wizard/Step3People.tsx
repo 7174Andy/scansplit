@@ -6,7 +6,11 @@ import { useWizardStore } from "../../store/wizardStore";
 import { PersonChip } from "../../components/PersonChip";
 
 export function Step3People({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
-  const { people, addPerson, removePerson } = useWizardStore();
+  const people = useWizardStore((s) => s.people);
+  const paidByPersonId = useWizardStore((s) => s.transaction.paidByPersonId);
+  const addPerson = useWizardStore((s) => s.addPerson);
+  const removePerson = useWizardStore((s) => s.removePerson);
+  const setPayer = useWizardStore((s) => s.setPayer);
   const [name, setName] = useState("");
 
   function commit() {
@@ -15,6 +19,8 @@ export function Step3People({ onBack, onNext }: { onBack: () => void; onNext: ()
     addPerson(n);
     setName("");
   }
+
+  const canAdvance = people.length > 0 && paidByPersonId != null;
 
   return (
     <div>
@@ -36,11 +42,28 @@ export function Step3People({ onBack, onNext }: { onBack: () => void; onNext: ()
         ))}
       </div>
 
+      {people.length > 0 && (
+        <label className="mt-4 flex items-center gap-2 text-sm">
+          <span>Paid by</span>
+          <select
+            aria-label="Paid by"
+            value={paidByPersonId ?? ""}
+            onChange={(e) => setPayer(e.target.value || null)}
+            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+          >
+            {paidByPersonId == null && <option value="">— Select —</option>}
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <div className="mt-6 flex gap-2">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="size-4" /> Back
         </Button>
-        <Button disabled={people.length === 0} onClick={onNext}>
+        <Button disabled={!canAdvance} onClick={onNext}>
           Next <ArrowRight className="size-4" />
         </Button>
       </div>
