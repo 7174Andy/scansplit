@@ -7,7 +7,7 @@ import type { FullTransaction } from "@/lib/types";
 
 function sampleFull(): FullTransaction {
   return {
-    transaction: { id: "t1", title: "Dinner", currency: "USD", createdAt: 0, updatedAt: 0 },
+    transaction: { id: "t1", title: "Dinner", currency: "USD", createdAt: 0, updatedAt: 0, paidByPersonId: null },
     people: [
       { id: "p1", transactionId: "t1", name: "Alice", position: 0, paidAt: null },
       { id: "p2", transactionId: "t1", name: "Bob", position: 1, paidAt: null },

@@ -53,6 +53,7 @@ const stubApi: TauriApi = {
     return {
       transaction: {
         id, title: "Stub", currency: "USD", createdAt: 0, updatedAt: 0,
+        paidByPersonId: null,
       },
       people: [], receipts: [], items: [],
     };
