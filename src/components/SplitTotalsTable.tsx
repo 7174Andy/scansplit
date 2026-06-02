@@ -53,8 +53,8 @@ export function SplitTotalsTable({
         // behaviour), UNLESS payerPersonId is set without an onTogglePaid handler
         // (Step 5 / read-only mode). In that case only render the locked payer
         // checkbox so non-payer rows don't show inert, unclickable boxes.
-        const noHandlerWithPayer = payerPersonId != null && onTogglePaid === undefined;
-        const showCheckbox = showPaid && (isPayer || !noHandlerWithPayer);
+        const readOnlyPayerMode = payerPersonId != null && onTogglePaid === undefined;
+        const showCheckbox = showPaid && (isPayer || !readOnlyPayerMode);
         return (
           <details
             key={p.personId}
@@ -65,7 +65,7 @@ export function SplitTotalsTable({
                 {showCheckbox && (
                   <input
                     type="checkbox"
-                    aria-label={`Mark ${personNames[p.personId] ?? "person"} paid`}
+                    aria-label={isPayer ? `${personNames[p.personId] ?? "person"} paid this bill` : `Mark ${personNames[p.personId] ?? "person"} paid`}
                     checked={isPaid}
                     disabled={isPayer}
                     onClick={(e) => e.stopPropagation()}
