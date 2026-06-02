@@ -133,6 +133,106 @@ describe("SplitTotalsTable paid status", () => {
     renderWithPaid({});
     expect(screen.queryAllByRole("checkbox").length).toBe(0);
   });
+
+  it("payer row checkbox is checked and disabled", () => {
+    renderWithPaid({
+      paidByPersonId: { p1: null, p2: null },
+      onTogglePaid: () => {},
+    });
+    // Re-render with payer prop:
+    cleanup();
+    const split: SplitResult = {
+      totalCents: 1000,
+      perPerson: [
+        {
+          personId: "p1",
+          totalCents: 500,
+          itemBreakdown: [
+            line({ itemId: "i1", shareCents: 500, itemKind: "item", itemPriceCents: 1000, sharerCount: 2 }),
+          ],
+        },
+        {
+          personId: "p2",
+          totalCents: 500,
+          itemBreakdown: [
+            line({ itemId: "i1", shareCents: 500, itemKind: "item", itemPriceCents: 1000, sharerCount: 2 }),
+          ],
+        },
+      ],
+    };
+    render(
+      <SplitTotalsTable
+        split={split}
+        personNames={{ p1: "Alice", p2: "Bob" }}
+        itemNames={{ i1: "Pizza" }}
+        currency="USD"
+        paidByPersonId={{ p1: null, p2: null }}
+        onTogglePaid={() => {}}
+        payerPersonId="p1"
+      />
+    );
+    const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    expect(boxes[0].checked).toBe(true);
+    expect(boxes[0].disabled).toBe(true);
+    expect(boxes[1].disabled).toBe(false);
+  });
+
+  it("clicking the payer row checkbox does not invoke onTogglePaid", () => {
+    const calls: Array<[string, boolean]> = [];
+    const split: SplitResult = {
+      totalCents: 1000,
+      perPerson: [
+        {
+          personId: "p1", totalCents: 500,
+          itemBreakdown: [line({ itemId: "i1", shareCents: 500, itemKind: "item", itemPriceCents: 1000, sharerCount: 2 })],
+        },
+      ],
+    };
+    render(
+      <SplitTotalsTable
+        split={split}
+        personNames={{ p1: "Alice" }}
+        itemNames={{ i1: "Pizza" }}
+        currency="USD"
+        paidByPersonId={{ p1: null }}
+        onTogglePaid={(id, next) => calls.push([id, next])}
+        payerPersonId="p1"
+      />
+    );
+    const box = screen.getByRole("checkbox") as HTMLInputElement;
+    fireEvent.click(box);
+    expect(calls).toEqual([]);
+  });
+
+  it("when onTogglePaid is omitted, only the payer row shows a checkbox (Step 5 case)", () => {
+    const split: SplitResult = {
+      totalCents: 1000,
+      perPerson: [
+        {
+          personId: "p1", totalCents: 500,
+          itemBreakdown: [line({ itemId: "i1", shareCents: 500, itemKind: "item", itemPriceCents: 1000, sharerCount: 2 })],
+        },
+        {
+          personId: "p2", totalCents: 500,
+          itemBreakdown: [line({ itemId: "i1", shareCents: 500, itemKind: "item", itemPriceCents: 1000, sharerCount: 2 })],
+        },
+      ],
+    };
+    render(
+      <SplitTotalsTable
+        split={split}
+        personNames={{ p1: "Alice", p2: "Bob" }}
+        itemNames={{ i1: "Pizza" }}
+        currency="USD"
+        paidByPersonId={{}}
+        payerPersonId="p1"
+      />
+    );
+    const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    expect(boxes.length).toBe(1);
+    expect(boxes[0].checked).toBe(true);
+    expect(boxes[0].disabled).toBe(true);
+  });
 });
 
 describe("SplitTotalsTable", () => {

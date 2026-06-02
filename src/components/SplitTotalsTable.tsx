@@ -1,4 +1,4 @@
-import type { SplitResult } from "../lib/splitMath";
+import type { SplitResult } from "../lib/types";
 import { formatCents } from "../lib/formatCurrency";
 import { formatBreakdown } from "../lib/breakdownFormat";
 import { SplitMathHelpDialog } from "./SplitMathHelpDialog";
@@ -10,6 +10,7 @@ interface Props {
   currency: string;
   paidByPersonId?: Record<string, number | null>;
   onTogglePaid?: (personId: string, nextPaid: boolean) => void;
+  payerPersonId?: string | null;
 }
 
 function formatPaidDate(ms: number): string {
@@ -26,6 +27,7 @@ export function SplitTotalsTable({
   currency,
   paidByPersonId,
   onTogglePaid,
+  payerPersonId,
 }: Props) {
   const showPaid = paidByPersonId !== undefined;
   return (
@@ -43,8 +45,16 @@ export function SplitTotalsTable({
         </p>
       )}
       {split.perPerson.map((p) => {
-        const paidAt = showPaid ? paidByPersonId![p.personId] ?? null : null;
-        const isPaid = paidAt != null;
+        const isPayer = payerPersonId != null && p.personId === payerPersonId;
+        const storedPaidAt = showPaid ? paidByPersonId![p.personId] ?? null : null;
+        const isPaid = isPayer || storedPaidAt != null;
+        const paidAtForDisplay = isPayer ? null : storedPaidAt;
+        // Show the checkbox for all rows when paidByPersonId is provided (old
+        // behaviour), UNLESS payerPersonId is set without an onTogglePaid handler
+        // (Step 5 / read-only mode). In that case only render the locked payer
+        // checkbox so non-payer rows don't show inert, unclickable boxes.
+        const noHandlerWithPayer = payerPersonId != null && onTogglePaid === undefined;
+        const showCheckbox = showPaid && (isPayer || !noHandlerWithPayer);
         return (
           <details
             key={p.personId}
@@ -52,20 +62,24 @@ export function SplitTotalsTable({
           >
             <summary className="flex items-center justify-between hover:opacity-80">
               <span className="flex items-center gap-2">
-                {showPaid && (
+                {showCheckbox && (
                   <input
                     type="checkbox"
                     aria-label={`Mark ${personNames[p.personId] ?? "person"} paid`}
                     checked={isPaid}
+                    disabled={isPayer}
                     onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => onTogglePaid?.(p.personId, e.target.checked)}
-                    className="size-4 cursor-pointer accent-primary"
+                    onChange={(e) => {
+                      if (isPayer) return;
+                      onTogglePaid?.(p.personId, e.target.checked);
+                    }}
+                    className="size-4 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 )}
                 <span>{personNames[p.personId] ?? "?"}</span>
-                {isPaid && paidAt != null && (
+                {paidAtForDisplay != null && (
                   <span className="text-xs text-muted-foreground">
-                    Paid · {formatPaidDate(paidAt)}
+                    Paid · {formatPaidDate(paidAtForDisplay)}
                   </span>
                 )}
               </span>
