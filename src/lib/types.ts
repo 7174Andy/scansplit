@@ -43,6 +43,7 @@ export interface TransactionMeta {
   currency: string;
   createdAt: number;
   updatedAt: number;
+  paidByPersonId: string | null;
 }
 
 export interface ReceiptRecord {
