@@ -97,6 +97,12 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
 }
 
 pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
+    if let Some(ref pid) = full.transaction.paid_by_person_id {
+        if !full.people.iter().any(|p| &p.id == pid) {
+            return Err(crate::error::AppError::InvalidPayer);
+        }
+    }
+
     // Snapshot existing receipt bytes so payloads that omit bytes (the edit
     // flow) preserve the original blob.
     struct ExistingBytes {
@@ -191,6 +197,14 @@ pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResul
                 .bind(&it.id).bind(pid).execute(&mut *tx2).await?;
         }
     }
+    sqlx::query(
+        "UPDATE transactions SET paid_by_person_id = ? WHERE id = ?",
+    )
+    .bind(full.transaction.paid_by_person_id.as_ref())
+    .bind(&full.transaction.id)
+    .execute(&mut *tx2)
+    .await?;
+
     tx2.commit().await?;
     Ok(())
 }

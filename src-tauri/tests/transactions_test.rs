@@ -298,3 +298,41 @@ async fn insert_full_rejects_unknown_payer() {
     let err = queries::insert_full(&pool, &f).await.unwrap_err();
     assert!(matches!(err, scansplit_lib::error::AppError::InvalidPayer));
 }
+
+#[tokio::test]
+async fn replace_full_changes_payer() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-payer-replace");
+    f.transaction.paid_by_person_id = Some("p1".into());
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    f.transaction.paid_by_person_id = Some("p2".into());
+    queries::replace_full(&pool, &f).await.unwrap();
+
+    let got = queries::get_full(&pool, "t-payer-replace").await.unwrap();
+    assert_eq!(got.transaction.paid_by_person_id, Some("p2".into()));
+}
+
+#[tokio::test]
+async fn replace_full_clears_payer_when_set_to_none() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-payer-clear");
+    f.transaction.paid_by_person_id = Some("p1".into());
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    f.transaction.paid_by_person_id = None;
+    queries::replace_full(&pool, &f).await.unwrap();
+
+    let got = queries::get_full(&pool, "t-payer-clear").await.unwrap();
+    assert_eq!(got.transaction.paid_by_person_id, None);
+}
+
+#[tokio::test]
+async fn replace_full_rejects_unknown_payer() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-payer-bad-replace");
+    queries::insert_full(&pool, &f).await.unwrap();
+    f.transaction.paid_by_person_id = Some("ghost".into());
+    let err = queries::replace_full(&pool, &f).await.unwrap_err();
+    assert!(matches!(err, scansplit_lib::error::AppError::InvalidPayer));
+}
