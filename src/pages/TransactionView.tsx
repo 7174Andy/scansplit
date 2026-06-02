@@ -43,6 +43,10 @@ export default function TransactionView() {
   const personNames = Object.fromEntries(full.people.map((p) => [p.id, p.name]));
   const itemNames = Object.fromEntries(full.items.map((i) => [i.id, i.name]));
   const paidByPersonId = Object.fromEntries(full.people.map((p) => [p.id, p.paidAt]));
+  const payerName =
+    full.transaction.paidByPersonId != null
+      ? full.people.find((p) => p.id === full.transaction.paidByPersonId)?.name ?? null
+      : null;
 
   async function togglePaid(personId: string, nextPaid: boolean) {
     if (!full) return;
@@ -124,6 +128,11 @@ export default function TransactionView() {
         </Button>
       </div>
       {err && <p className="mb-2 text-destructive">{err}</p>}
+      {payerName && (
+        <p className="mb-2 text-sm text-muted-foreground">
+          {payerName} paid. Splitting the rest:
+        </p>
+      )}
       <SplitTotalsTable
         split={split}
         personNames={personNames}
@@ -131,6 +140,7 @@ export default function TransactionView() {
         currency={full.transaction.currency}
         paidByPersonId={paidByPersonId}
         onTogglePaid={togglePaid}
+        payerPersonId={full.transaction.paidByPersonId}
       />
 
       <ReceiptViewerDialog
