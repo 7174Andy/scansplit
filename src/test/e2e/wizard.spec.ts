@@ -225,6 +225,48 @@ test("view receipt button opens the receipt image in a modal", async ({ page }) 
   await expect(img).not.toBeVisible();
 });
 
+test("payer is auto-selected, can be changed, and the payer row is locked at Step 5", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "New Split" }).click();
+  await page.evaluate((parsed) => {
+    (window as any).__scansplit_seed__("r-test-payer", parsed);
+  }, {
+    merchant: null,
+    items: [{ raw: "PIZZA", name: "Pizza", priceCents: 2000, kind: "item" }],
+  });
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+
+  await page.getByPlaceholder("Name").fill("Alice");
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByPlaceholder("Name").fill("Bob");
+  await page.getByRole("button", { name: "Add" }).click();
+
+  // Auto-selected to the first person (Alice).
+  const select = page.getByLabel("Paid by");
+  await expect(select).toBeVisible();
+  await expect(select).toHaveValue(/.+/); // non-empty
+
+  // Switch payer to Bob.
+  const bobOption = page.locator("option", { hasText: "Bob" });
+  const bobValue = await bobOption.getAttribute("value");
+  await select.selectOption(bobValue!);
+
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+
+  await expect(page.getByText(/Bob paid\. Splitting the rest:/i)).toBeVisible();
+
+  // Bob's row checkbox: aria-label is "Bob paid this bill" (from Task 12 cleanup).
+  const bobBox = page.getByRole("checkbox", { name: /Bob paid this bill/i });
+  await expect(bobBox).toBeChecked();
+  await expect(bobBox).toBeDisabled();
+
+  // Alice's row in Step 5 — readOnlyPayerMode hides her checkbox entirely
+  // (only the payer's checkbox renders when there's no settle handler).
+  await expect(page.getByRole("checkbox", { name: /Mark Alice paid/i })).toHaveCount(0);
+});
+
 test("scan progress ring snaps through stages", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "New Split" }).click();
