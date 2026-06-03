@@ -1,17 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserPlus, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useWizardStore } from "../../store/wizardStore";
 import { PersonChip } from "../../components/PersonChip";
 
 export function Step3People({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
   const people = useWizardStore((s) => s.people);
   const paidByPersonId = useWizardStore((s) => s.transaction.paidByPersonId);
+  const isExisting = useWizardStore((s) => s.isExisting);
   const addPerson = useWizardStore((s) => s.addPerson);
   const removePerson = useWizardStore((s) => s.removePerson);
   const setPayer = useWizardStore((s) => s.setPayer);
   const [name, setName] = useState("");
+
+  // Self-heal: if this is a fresh (non-saved) wizard and people exist but no
+  // payer is set (e.g. stale sessionStorage from before this feature landed),
+  // auto-select the first person.
+  useEffect(() => {
+    if (!isExisting && people.length > 0 && paidByPersonId == null) {
+      setPayer(people[0].id);
+    }
+  }, [isExisting, people, paidByPersonId, setPayer]);
 
   function commit() {
     const n = name.trim();
@@ -43,19 +60,24 @@ export function Step3People({ onBack, onNext }: { onBack: () => void; onNext: ()
       </div>
 
       {people.length > 0 && (
-        <label className="mt-4 flex items-center gap-2 text-sm">
-          <span>Paid by</span>
-          <select
+        <div className="mt-4">
+          <label htmlFor="paid-by-trigger" className="mb-1.5 block text-sm">
+            Paid by
+          </label>
+          <Select
             value={paidByPersonId ?? ""}
-            onChange={(e) => setPayer(e.target.value || null)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            onValueChange={(v) => setPayer(v || null)}
           >
-            {paidByPersonId == null && <option value="">— Select —</option>}
-            {people.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger id="paid-by-trigger" aria-label="Paid by" className="w-full">
+              <SelectValue placeholder="— Select —" />
+            </SelectTrigger>
+            <SelectContent>
+              {people.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
 
       <div className="mt-6 flex gap-2">

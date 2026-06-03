@@ -158,10 +158,10 @@ test("payment status: tick checkboxes, reload, see settled / partial on home", a
 
   // Switch payer from Alice (auto-selected) to Bob, so Alice + Cara are debtors
   // and their "Mark X paid" checkboxes remain interactive.
-  const select = page.getByLabel("Paid by");
-  const bobOption = page.locator("option", { hasText: "Bob" });
-  const bobValue = await bobOption.getAttribute("value");
-  await select.selectOption(bobValue!);
+  // Radix Select: click the trigger, then click the option in the portal.
+  const trigger = page.getByLabel("Paid by");
+  await trigger.click();
+  await page.getByRole("option", { name: "Bob" }).click();
 
   await page.getByRole("button", { name: "Next" }).click(); // 3 -> 4
   await page.getByRole("button", { name: "Next" }).click(); // 4 -> 5
@@ -246,15 +246,16 @@ test("payer is auto-selected, can be changed, and the payer row is locked at Ste
   await page.getByPlaceholder("Name").fill("Bob");
   await page.getByRole("button", { name: "Add" }).click();
 
-  // Auto-selected to the first person (Alice).
-  const select = page.getByLabel("Paid by");
-  await expect(select).toBeVisible();
-  await expect(select).toHaveValue(/.+/); // non-empty
+  // Auto-selected to the first person (Alice). The SelectTrigger's text content
+  // reflects the selected SelectItem.
+  const trigger = page.getByLabel("Paid by");
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toContainText("Alice");
 
   // Switch payer to Bob.
-  const bobOption = page.locator("option", { hasText: "Bob" });
-  const bobValue = await bobOption.getAttribute("value");
-  await select.selectOption(bobValue!);
+  await trigger.click();
+  await page.getByRole("option", { name: "Bob" }).click();
+  await expect(trigger).toContainText("Bob");
 
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Next" }).click();
