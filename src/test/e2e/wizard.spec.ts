@@ -136,7 +136,7 @@ test("OCR retry: failed scan can be retried", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Add row" })).toBeVisible();
 });
 
-test("payment status: tick checkboxes, reload, see partial count on home", async ({ page }) => {
+test("payment status: tick checkboxes, reload, see settled / partial on home", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "New Split" }).click();
 
@@ -174,16 +174,16 @@ test("payment status: tick checkboxes, reload, see partial count on home", async
   await expect(aliceBox).toBeChecked();
   await expect(page.getByText(/Paid · /).first()).toBeVisible();
 
-  // Home shows "1 of 3 paid" — the payer's paid_at is still null in the DB.
+  // Bob (payer) is counted as paid in the home aggregate.
   await page.getByRole("button", { name: /Home/ }).click();
-  await expect(page.getByText("1 of 3 paid")).toBeVisible();
+  await expect(page.getByText("2 of 3 paid")).toBeVisible();
 
   // Reopen via the list, confirm persistence, then tick Cara too.
   await page.getByRole("link", { name: /Wine|Split/ }).first().click();
   await expect(page.getByRole("checkbox", { name: /Mark Alice paid/ })).toBeChecked();
   await page.getByRole("checkbox", { name: /Mark Cara paid/ }).check();
   await page.getByRole("button", { name: /Home/ }).click();
-  await expect(page.getByText("2 of 3 paid")).toBeVisible();
+  await expect(page.getByText("Settled")).toBeVisible();
 });
 
 test("view receipt button opens the receipt image in a modal", async ({ page }) => {
