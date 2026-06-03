@@ -336,3 +336,44 @@ async fn replace_full_rejects_unknown_payer() {
     let err = queries::replace_full(&pool, &f).await.unwrap_err();
     assert!(matches!(err, scansplit_lib::error::AppError::InvalidPayer));
 }
+
+#[tokio::test]
+async fn list_summaries_counts_payer_as_paid() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-list-payer");
+    f.transaction.paid_by_person_id = Some("p1".into());
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    let summaries = queries::list_summaries(&pool).await.unwrap();
+    let found = summaries.iter().find(|s| s.id == "t-list-payer").unwrap();
+    assert_eq!(found.people_count, 2);
+    // p1 is the payer (paid_at is NULL) → counted as paid; p2 has paid_at NULL → not paid.
+    assert_eq!(found.paid_count, 1);
+}
+
+#[tokio::test]
+async fn list_summaries_counts_payer_plus_manual_settles() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-list-both");
+    f.transaction.paid_by_person_id = Some("p1".into());
+    f.people[1].paid_at = Some(1_700_000_000_000); // p2 manually settled
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    let summaries = queries::list_summaries(&pool).await.unwrap();
+    let found = summaries.iter().find(|s| s.id == "t-list-both").unwrap();
+    assert_eq!(found.paid_count, 2);
+}
+
+#[tokio::test]
+async fn list_summaries_does_not_double_count_payer_who_also_settled() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-list-no-double");
+    f.transaction.paid_by_person_id = Some("p1".into());
+    f.people[0].paid_at = Some(1_700_000_000_000); // p1 is payer AND has paid_at set
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    let summaries = queries::list_summaries(&pool).await.unwrap();
+    let found = summaries.iter().find(|s| s.id == "t-list-no-double").unwrap();
+    // p1 counted once even though both conditions match; p2 not paid.
+    assert_eq!(found.paid_count, 1);
+}

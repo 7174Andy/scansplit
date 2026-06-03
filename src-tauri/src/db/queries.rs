@@ -300,11 +300,16 @@ pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSumma
                 COALESCE(i.total_cents, 0)  AS total_cents
          FROM transactions t
          LEFT JOIN (
-             SELECT transaction_id,
+             SELECT tp.transaction_id,
                     COUNT(*) AS people_count,
-                    SUM(CASE WHEN paid_at IS NOT NULL THEN 1 ELSE 0 END) AS paid_count
-             FROM transaction_people
-             GROUP BY transaction_id
+                    SUM(CASE
+                          WHEN tp.paid_at IS NOT NULL THEN 1
+                          WHEN tp.id = t2.paid_by_person_id THEN 1
+                          ELSE 0
+                        END) AS paid_count
+             FROM transaction_people tp
+             JOIN transactions t2 ON t2.id = tp.transaction_id
+             GROUP BY tp.transaction_id
          ) p ON p.transaction_id = t.id
          LEFT JOIN (
              SELECT transaction_id, SUM(price_cents) AS total_cents
