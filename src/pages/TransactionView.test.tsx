@@ -7,7 +7,7 @@ import type { FullTransaction } from "@/lib/types";
 
 function sampleFull(): FullTransaction {
   return {
-    transaction: { id: "t1", title: "Dinner", currency: "USD", createdAt: 0, updatedAt: 0 },
+    transaction: { id: "t1", title: "Dinner", currency: "USD", createdAt: 0, updatedAt: 0, paidByPersonId: null },
     people: [
       { id: "p1", transactionId: "t1", name: "Alice", position: 0, paidAt: null },
       { id: "p2", transactionId: "t1", name: "Bob", position: 1, paidAt: null },
@@ -31,6 +31,38 @@ function renderView() {
     </MemoryRouter>
   );
 }
+
+describe("TransactionView payer header and locked row", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("shows payer header and disables payer checkbox when paidByPersonId is set", async () => {
+    const full: FullTransaction = {
+      ...sampleFull(),
+      transaction: {
+        ...sampleFull().transaction,
+        paidByPersonId: "p1",
+      },
+    };
+    vi.spyOn(api, "getTransaction").mockResolvedValue(full);
+    renderView();
+
+    // Header text
+    expect(await screen.findByText(/Alice paid\. Splitting the rest:/i)).toBeTruthy();
+
+    // Alice's checkbox should be checked and disabled (she is the payer)
+    const aliceBox = await screen.findByRole("checkbox", { name: /Alice paid this bill/i });
+    expect((aliceBox as HTMLInputElement).checked).toBe(true);
+    expect((aliceBox as HTMLInputElement).disabled).toBe(true);
+
+    // Bob's checkbox should be enabled (not the payer, paidAt is null → unchecked)
+    const bobBox = await screen.findByRole("checkbox", { name: /Mark Bob paid/ });
+    expect((bobBox as HTMLInputElement).disabled).toBe(false);
+    expect((bobBox as HTMLInputElement).checked).toBe(false);
+  });
+});
 
 describe("TransactionView paid toggle", () => {
   beforeEach(() => {

@@ -15,6 +15,11 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
   const store = useWizardStore();
   const { items, people, transaction, detectedMerchant, setTitle } = store;
 
+  const payerName =
+    transaction.paidByPersonId != null
+      ? people.find((p) => p.id === transaction.paidByPersonId)?.name ?? null
+      : null;
+
   const split = useMemo(() => {
     const lineItems = items.map((i) => ({
       id: i.id, name: i.name, priceCents: i.priceCents,
@@ -85,11 +90,18 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
         />
       </label>
 
+      {payerName && (
+        <p className="mb-2 text-sm text-muted-foreground">
+          {payerName} paid. Splitting the rest:
+        </p>
+      )}
       <SplitTotalsTable
         split={split}
         personNames={personNames}
         itemNames={itemNames}
         currency={transaction.currency}
+        paidByPersonId={{}}
+        payerPersonId={transaction.paidByPersonId}
       />
 
       <div className="mt-6 flex gap-2">

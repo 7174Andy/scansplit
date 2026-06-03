@@ -26,7 +26,7 @@ test("happy path: scan → confirm → people → assign → copy", async ({ pag
   await expect(page.getByRole("button", { name: /Copied/ })).toBeVisible();
 
   // $14 + $32 = $46 subtotal + $4.14 tax = $50.14 split 2 = $25.07 each.
-  await expect(page.getByText("Alice")).toBeVisible();
+  await expect(page.getByText("Alice").first()).toBeVisible();
   await expect(page.getByText(/\$25\.07/).first()).toBeVisible();
 });
 
@@ -136,11 +136,10 @@ test("OCR retry: failed scan can be retried", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Add row" })).toBeVisible();
 });
 
-test("payment status: tick checkbox, reload, see settled / partial on home", async ({ page }) => {
+test("payment status: tick checkboxes, reload, see settled / partial on home", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "New Split" }).click();
 
-  // Single $30 wine item, three people will split it.
   await page.evaluate(() => {
     (window as any).__scansplit_seed__("r-paid", {
       merchant: null,
@@ -156,27 +155,32 @@ test("payment status: tick checkbox, reload, see settled / partial on home", asy
   await page.getByRole("button", { name: "Add" }).click();
   await page.getByPlaceholder("Name").fill("Cara");
   await page.getByRole("button", { name: "Add" }).click();
+
+  // Switch payer from Alice (auto-selected) to Bob, so Alice + Cara are debtors
+  // and their "Mark X paid" checkboxes remain interactive.
+  // Radix Select: click the trigger, then click the option in the portal.
+  const trigger = page.getByLabel("Paid by");
+  await trigger.click();
+  await page.getByRole("option", { name: "Bob" }).click();
+
   await page.getByRole("button", { name: "Next" }).click(); // 3 -> 4
   await page.getByRole("button", { name: "Next" }).click(); // 4 -> 5
   await page.getByRole("button", { name: /^Save/ }).click();
   await page.waitForURL(/\/transaction\/[^/]+$/);
 
-  // On the detail page, tick Alice paid.
+  // Bob is the payer — his row is locked. Alice and Cara are debtor checkboxes.
   const aliceBox = page.getByRole("checkbox", { name: /Mark Alice paid/ });
   await aliceBox.check();
   await expect(aliceBox).toBeChecked();
   await expect(page.getByText(/Paid · /).first()).toBeVisible();
 
-  // Navigate home: row shows "1 of 3 paid".
+  // Bob (payer) is counted as paid in the home aggregate.
   await page.getByRole("button", { name: /Home/ }).click();
-  await expect(page.getByText("1 of 3 paid")).toBeVisible();
+  await expect(page.getByText("2 of 3 paid")).toBeVisible();
 
-  // Open the transaction again — persistence through getTransaction.
+  // Reopen via the list, confirm persistence, then tick Cara too.
   await page.getByRole("link", { name: /Wine|Split/ }).first().click();
   await expect(page.getByRole("checkbox", { name: /Mark Alice paid/ })).toBeChecked();
-
-  // Tick the remaining two and confirm the home list flips to Settled.
-  await page.getByRole("checkbox", { name: /Mark Bob paid/ }).check();
   await page.getByRole("checkbox", { name: /Mark Cara paid/ }).check();
   await page.getByRole("button", { name: /Home/ }).click();
   await expect(page.getByText("Settled")).toBeVisible();
@@ -223,6 +227,49 @@ test("view receipt button opens the receipt image in a modal", async ({ page }) 
   // ESC closes.
   await page.keyboard.press("Escape");
   await expect(img).not.toBeVisible();
+});
+
+test("payer is auto-selected, can be changed, and the payer row is locked at Step 5", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "New Split" }).click();
+  await page.evaluate((parsed) => {
+    (window as any).__scansplit_seed__("r-test-payer", parsed);
+  }, {
+    merchant: null,
+    items: [{ raw: "PIZZA", name: "Pizza", priceCents: 2000, kind: "item" }],
+  });
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+
+  await page.getByPlaceholder("Name").fill("Alice");
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByPlaceholder("Name").fill("Bob");
+  await page.getByRole("button", { name: "Add" }).click();
+
+  // Auto-selected to the first person (Alice). The SelectTrigger's text content
+  // reflects the selected SelectItem.
+  const trigger = page.getByLabel("Paid by");
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toContainText("Alice");
+
+  // Switch payer to Bob.
+  await trigger.click();
+  await page.getByRole("option", { name: "Bob" }).click();
+  await expect(trigger).toContainText("Bob");
+
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+
+  await expect(page.getByText(/Bob paid\. Splitting the rest:/i)).toBeVisible();
+
+  // Bob's row checkbox: aria-label is "Bob paid this bill" (from Task 12 cleanup).
+  const bobBox = page.getByRole("checkbox", { name: /Bob paid this bill/i });
+  await expect(bobBox).toBeChecked();
+  await expect(bobBox).toBeDisabled();
+
+  // Alice's row in Step 5 — readOnlyPayerMode hides her checkbox entirely
+  // (only the payer's checkbox renders when there's no settle handler).
+  await expect(page.getByRole("checkbox", { name: /Mark Alice paid/i })).toHaveCount(0);
 });
 
 test("scan progress ring snaps through stages", async ({ page }) => {

@@ -113,4 +113,49 @@ describe("wizardStore", () => {
     useWizardStore.getState().removeReceipt("r4");
     expect(useWizardStore.getState().scanStage["r4"]).toBeUndefined();
   });
+
+  it("emptyMeta initializes paidByPersonId to null", () => {
+    expect(useWizardStore.getState().transaction.paidByPersonId).toBeNull();
+  });
+
+  it("addPerson auto-selects the first person as payer", () => {
+    const s = useWizardStore.getState();
+    s.addPerson("Alice");
+    const alice = useWizardStore.getState().people[0];
+    expect(useWizardStore.getState().transaction.paidByPersonId).toBe(alice.id);
+  });
+
+  it("addPerson does not overwrite an existing payer", () => {
+    const s = useWizardStore.getState();
+    s.addPerson("Alice");
+    const alice = useWizardStore.getState().people[0];
+    s.addPerson("Bob");
+    expect(useWizardStore.getState().transaction.paidByPersonId).toBe(alice.id);
+  });
+
+  it("setPayer updates the field", () => {
+    const s = useWizardStore.getState();
+    s.addPerson("Alice");
+    s.addPerson("Bob");
+    const bob = useWizardStore.getState().people[1];
+    useWizardStore.getState().setPayer(bob.id);
+    expect(useWizardStore.getState().transaction.paidByPersonId).toBe(bob.id);
+  });
+
+  it("removePerson of the payer reassigns to the first remaining person", () => {
+    const s = useWizardStore.getState();
+    s.addPerson("Alice");
+    s.addPerson("Bob");
+    const [alice, bob] = useWizardStore.getState().people;
+    useWizardStore.getState().removePerson(alice.id);
+    expect(useWizardStore.getState().transaction.paidByPersonId).toBe(bob.id);
+  });
+
+  it("removePerson of the last person leaves paidByPersonId null", () => {
+    const s = useWizardStore.getState();
+    s.addPerson("Alice");
+    const alice = useWizardStore.getState().people[0];
+    useWizardStore.getState().removePerson(alice.id);
+    expect(useWizardStore.getState().transaction.paidByPersonId).toBeNull();
+  });
 });

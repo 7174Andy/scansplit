@@ -3,6 +3,15 @@ use crate::db::models::{FullTransaction, Item, Person, Receipt, Transaction};
 use crate::error::AppResult;
 use sqlx::{Row, SqlitePool};
 
+fn validate_payer(full: &FullTransaction) -> AppResult<()> {
+    if let Some(ref pid) = full.transaction.paid_by_person_id {
+        if !full.people.iter().any(|p| &p.id == pid) {
+            return Err(crate::error::AppError::InvalidPayer);
+        }
+    }
+    Ok(())
+}
+
 pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
     // Decode + validate bytes for every receipt before opening the tx, so we
     // never half-write a transaction whose payload was invalid.
@@ -20,6 +29,8 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
             )))?;
         decoded.push((idx, bytes));
     }
+
+    validate_payer(full)?;
 
     let mut tx = pool.begin().await?;
 
@@ -78,11 +89,21 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
         }
     }
 
+    if let Some(ref pid) = full.transaction.paid_by_person_id {
+        sqlx::query("UPDATE transactions SET paid_by_person_id = ? WHERE id = ?")
+            .bind(pid)
+            .bind(&full.transaction.id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
     tx.commit().await?;
     Ok(())
 }
 
 pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult<()> {
+    validate_payer(full)?;
+
     // Snapshot existing receipt bytes so payloads that omit bytes (the edit
     // flow) preserve the original blob.
     struct ExistingBytes {
@@ -177,13 +198,22 @@ pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResul
                 .bind(&it.id).bind(pid).execute(&mut *tx2).await?;
         }
     }
+    sqlx::query(
+        "UPDATE transactions SET paid_by_person_id = ? WHERE id = ?",
+    )
+    .bind(full.transaction.paid_by_person_id.as_ref())
+    .bind(&full.transaction.id)
+    .execute(&mut *tx2)
+    .await?;
+
     tx2.commit().await?;
     Ok(())
 }
 
 pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction> {
     let row = sqlx::query(
-        "SELECT id, title, currency, created_at, updated_at FROM transactions WHERE id = ?",
+        "SELECT id, title, currency, created_at, updated_at, paid_by_person_id
+         FROM transactions WHERE id = ?",
     )
     .bind(id).fetch_optional(pool).await?;
     let row = row.ok_or(crate::error::AppError::NotFound)?;
@@ -193,6 +223,7 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
         currency: row.get("currency"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
+        paid_by_person_id: row.get("paid_by_person_id"),
     };
 
     let people: Vec<Person> = sqlx::query(
@@ -269,11 +300,16 @@ pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSumma
                 COALESCE(i.total_cents, 0)  AS total_cents
          FROM transactions t
          LEFT JOIN (
-             SELECT transaction_id,
+             SELECT tp.transaction_id,
                     COUNT(*) AS people_count,
-                    SUM(CASE WHEN paid_at IS NOT NULL THEN 1 ELSE 0 END) AS paid_count
-             FROM transaction_people
-             GROUP BY transaction_id
+                    SUM(CASE
+                          WHEN tp.paid_at IS NOT NULL THEN 1
+                          WHEN tp.id = t2.paid_by_person_id THEN 1
+                          ELSE 0
+                        END) AS paid_count
+             FROM transaction_people tp
+             JOIN transactions t2 ON t2.id = tp.transaction_id
+             GROUP BY tp.transaction_id
          ) p ON p.transaction_id = t.id
          LEFT JOIN (
              SELECT transaction_id, SUM(price_cents) AS total_cents

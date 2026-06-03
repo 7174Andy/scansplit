@@ -53,6 +53,7 @@ const stubApi: TauriApi = {
     return {
       transaction: {
         id, title: "Stub", currency: "USD", createdAt: 0, updatedAt: 0,
+        paidByPersonId: null,
       },
       people: [], receipts: [], items: [],
     };
@@ -65,7 +66,11 @@ const stubApi: TauriApi = {
           currency: lastSaved.transaction.currency,
           updatedAt: lastSaved.transaction.updatedAt,
           peopleCount: lastSaved.people.length,
-          paidCount: lastSaved.people.filter((p) => p.paidAt != null).length,
+          paidCount: lastSaved.people.filter(
+            (p) =>
+              p.paidAt != null ||
+              p.id === lastSaved!.transaction.paidByPersonId
+          ).length,
           totalCents: lastSaved.items.reduce((s, i) => s + i.priceCents, 0),
         }]
       : [],

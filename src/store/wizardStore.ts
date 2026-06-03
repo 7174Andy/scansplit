@@ -44,6 +44,7 @@ interface WizardState {
 
   toggleAssignment: (itemId: string, personId: string) => void;
   setTitle: (t: string) => void;
+  setPayer: (personId: string | null) => void;
 
   toFull: () => FullTransaction;
 }
@@ -64,6 +65,7 @@ function emptyMeta(id?: string): TransactionMeta {
     currency: "USD",
     createdAt: t,
     updatedAt: t,
+    paidByPersonId: null,
   };
 }
 
@@ -176,19 +178,25 @@ export const useWizardStore = create<WizardState>()(
 
       setPeople: (people) => set({ people }),
 
-      addPerson: (name) => set((st) => ({
-        people: [
-          ...st.people,
-          { id: newId(), transactionId: st.transaction.id, name, position: st.people.length, paidAt: null },
-        ],
-      })),
+      addPerson: (name) => set((st) => {
+        const newPerson = { id: newId(), transactionId: st.transaction.id, name, position: st.people.length, paidAt: null };
+        const nextPayer = st.transaction.paidByPersonId ?? newPerson.id;
+        return {
+          people: [...st.people, newPerson],
+          transaction: { ...st.transaction, paidByPersonId: nextPayer },
+        };
+      }),
 
       removePerson: (id) => set((st) => {
-        const remainingIds = st.people
-          .filter((p) => p.id !== id)
-          .map((p) => p.id);
+        const remaining = st.people.filter((p) => p.id !== id);
+        const remainingIds = remaining.map((p) => p.id);
+        let nextPayer = st.transaction.paidByPersonId;
+        if (nextPayer === id) {
+          nextPayer = remaining[0]?.id ?? null;
+        }
         return {
-          people: st.people.filter((p) => p.id !== id),
+          people: remaining,
+          transaction: { ...st.transaction, paidByPersonId: nextPayer },
           items: st.items.map((i) => {
             const filtered = i.assignedPersonIds.filter((p) => p !== id);
             const isEveryone =
@@ -231,6 +239,10 @@ export const useWizardStore = create<WizardState>()(
 
       setTitle: (t) => set((st) => ({
         transaction: { ...st.transaction, title: t, updatedAt: now() },
+      })),
+
+      setPayer: (personId) => set((st) => ({
+        transaction: { ...st.transaction, paidByPersonId: personId, updatedAt: now() },
       })),
 
       toFull: (): FullTransaction => {
