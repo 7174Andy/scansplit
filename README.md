@@ -25,6 +25,28 @@ No accounts. No server. The only outbound network call is to `api.anthropic.com`
 - **Local-first storage** — SQLite database in your OS app-data directory; nothing leaves your machine except the OCR request.
 - **Automatic image preprocessing** — large photos are downscaled to fit Anthropic's 5 MB image cap, and the media type is detected from the file's magic bytes (not the extension).
 
+## Installing the App
+
+Grab the build for your platform from the [releases page](https://7174andy.github.io/scansplit/). On first run, open **Settings** and paste your Anthropic API key — it's stored in your OS keychain, never on disk or any server.
+
+> **Heads up:** ScanSplit's releases aren't yet code-signed or notarized, so your OS will warn you the first time you open it. This is expected for an unsigned app — here's how to get past it.
+
+### First launch on macOS
+
+The downloaded `.dmg` isn't notarized by Apple, so Gatekeeper blocks it on first open with *"ScanSplit can't be opened because Apple cannot check it for malicious software."* To run it anyway:
+
+1. Download the `.dmg` for your chip — **Apple Silicon** (M-series) uses the `aarch64` build, **Intel** uses the `x64` build — then drag **ScanSplit** into your **Applications** folder.
+2. **macOS 14 (Sonoma) and earlier:** right-click (or Control-click) ScanSplit in Applications → **Open** → **Open** in the dialog. macOS remembers the choice, so later launches are normal.
+3. **macOS 15 (Sequoia) and later:** double-click once and dismiss the warning, then go to **System Settings → Privacy & Security**, scroll to the message naming ScanSplit, and click **Open Anyway**.
+
+### First launch on Windows
+
+SmartScreen shows *"Windows protected your PC"* for the unsigned `.msi`. Click **More info → Run anyway** to install.
+
+### First launch on Linux
+
+The `.AppImage` and `.deb` are unsigned; mark the AppImage executable (`chmod +x`) or install the `.deb` with your package manager as usual.
+
 ## Tech Stack
 
 | Layer              | Tech                                                                                                                      |

@@ -13,12 +13,20 @@
     "windows": [
       { "title": "ScanSplit", "width": 1100, "height": 760, "resizable": true }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'"
+    }
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.png"]
+    "icon": ["icons/icon.png"],
+    "publisher": "Andrew Park",
+    "copyright": "© 2026 Andrew Park. All rights reserved.",
+    "category": "Finance",
+    "homepage": "https://7174andy.github.io/scansplit/",
+    "shortDescription": "Split receipts fairly. Locally.",
+    "longDescription": "ScanSplit turns receipt photos into a fair per-person cost split. Line items are read by the Anthropic API; everything else stays on your machine. No accounts, no server."
   },
   "plugins": {}
 }
