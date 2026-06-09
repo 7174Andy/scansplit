@@ -75,7 +75,11 @@ jobs:
         run: |
           vcpkg install libheif:x64-windows-static-md
           echo "VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT" >> "$GITHUB_ENV"
-          echo "VCPKGRS_DYNAMIC=1" >> "$GITHUB_ENV"
+          # Match the triplet we just installed. The libheif-sys build script
+          # resolves the lib via the `vcpkg` crate; VCPKGRS_DYNAMIC=1 made it
+          # look for the (uninstalled) dynamic x64-windows triplet and fail.
+          # Pin to static-md so libheif links into the exe (no DLLs to bundle).
+          echo "VCPKGRS_TRIPLET=x64-windows-static-md" >> "$GITHUB_ENV"
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
