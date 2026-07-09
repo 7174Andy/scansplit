@@ -35,7 +35,7 @@ describe("Step3People — Paid by selector", () => {
   it("disables Next when there are people but no payer (legacy-edit case)", () => {
     // loadFrom sets isExisting=true, so the self-heal effect is suppressed.
     useWizardStore.getState().loadFrom({
-      transaction: { id: "t", title: "x", currency: "USD", createdAt: 0, updatedAt: 0, paidByPersonId: null },
+      transaction: { id: "t", title: "x", currency: "USD", createdAt: 0, updatedAt: 0, paidByPersonId: null, date: "2026-01-01" },
       people: [{ id: "p1", transactionId: "t", name: "Alice", position: 0, paidAt: null }],
       receipts: [],
       items: [],

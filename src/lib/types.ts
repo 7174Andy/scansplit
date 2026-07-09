@@ -44,6 +44,7 @@ export interface TransactionMeta {
   createdAt: number;
   updatedAt: number;
   paidByPersonId: string | null;
+  date: string; // calendar date, YYYY-MM-DD (local)
 }
 
 export interface ReceiptRecord {
@@ -94,6 +95,7 @@ export interface TransactionSummary {
   peopleCount: number;
   paidCount: number;
   totalCents: number;
+  date: string; // calendar date, YYYY-MM-DD (local)
 }
 
 export interface ParsedItem {

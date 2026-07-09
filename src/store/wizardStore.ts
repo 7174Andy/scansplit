@@ -44,6 +44,7 @@ interface WizardState {
 
   toggleAssignment: (itemId: string, personId: string) => void;
   setTitle: (t: string) => void;
+  setDate: (date: string) => void;
   setPayer: (personId: string | null) => void;
 
   toFull: () => FullTransaction;
@@ -57,6 +58,14 @@ function now(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function emptyMeta(id?: string): TransactionMeta {
   const t = now();
   return {
@@ -66,6 +75,7 @@ function emptyMeta(id?: string): TransactionMeta {
     createdAt: t,
     updatedAt: t,
     paidByPersonId: null,
+    date: todayIso(),
   };
 }
 
@@ -239,6 +249,10 @@ export const useWizardStore = create<WizardState>()(
 
       setTitle: (t) => set((st) => ({
         transaction: { ...st.transaction, title: t, updatedAt: now() },
+      })),
+
+      setDate: (date) => set((st) => ({
+        transaction: { ...st.transaction, date, updatedAt: now() },
       })),
 
       setPayer: (personId) => set((st) => ({
