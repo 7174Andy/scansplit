@@ -53,3 +53,23 @@ describe("Home paid indicator", () => {
     expect(screen.queryByText("Settled")).toBeNull();
   });
 });
+
+describe("Home date display", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("shows the transaction date", async () => {
+    vi.spyOn(api, "listTransactions").mockResolvedValue([
+      {
+        id: "t4", title: "Brunch", currency: "USD", updatedAt: 0, date: "2026-07-15",
+        peopleCount: 2, paidCount: 0, totalCents: 5000,
+      },
+    ]);
+    renderHome();
+    expect(await screen.findByText("Brunch")).toBeTruthy();
+    expect(screen.getByText(/2026/)).toBeTruthy();
+    expect(screen.getByText(/15/)).toBeTruthy();
+  });
+});
