@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Copy as CopyIcon, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/DatePicker";
 import { useWizardStore } from "../../store/wizardStore";
 import { computeSplit } from "../../lib/splitMath";
 import { SplitTotalsTable } from "../../components/SplitTotalsTable";
@@ -89,15 +90,10 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
           className="inline-block w-80"
         />
       </label>
-      <label className="mb-3 block">
-        Date:&nbsp;
-        <Input
-          type="date"
-          value={transaction.date}
-          onChange={(e) => setDate(e.target.value)}
-          className="inline-block w-48"
-        />
-      </label>
+      <div className="mb-3 block">
+        <span>Date:&nbsp;</span>
+        <DatePicker value={transaction.date} onChange={setDate} />
+      </div>
 
       {payerName && (
         <p className="mb-2 text-sm text-muted-foreground">
