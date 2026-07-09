@@ -13,7 +13,7 @@ import { api } from "../../lib/tauri";
 export function Step5Result({ onBack }: { onBack: () => void }) {
   const navigate = useNavigate();
   const store = useWizardStore();
-  const { items, people, transaction, detectedMerchant, setTitle } = store;
+  const { items, people, transaction, detectedMerchant, setTitle, setDate } = store;
 
   const payerName =
     transaction.paidByPersonId != null
@@ -87,6 +87,15 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
           value={transaction.title}
           onChange={(e) => setTitle(e.target.value)}
           className="inline-block w-80"
+        />
+      </label>
+      <label className="mb-3 block">
+        Date:&nbsp;
+        <Input
+          type="date"
+          value={transaction.date}
+          onChange={(e) => setDate(e.target.value)}
+          className="inline-block w-48"
         />
       </label>
 
