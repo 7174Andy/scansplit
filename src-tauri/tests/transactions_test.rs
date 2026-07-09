@@ -23,6 +23,7 @@ fn sample_full(id: &str) -> FullTransaction {
             created_at: 1,
             updated_at: 1,
             paid_by_person_id: None,
+            date: "2026-07-09".into(),
         },
         people: vec![
             Person { id: "p1".into(), transaction_id: id.into(), name: "Alice".into(), position: 0, paid_at: None },
@@ -376,4 +377,36 @@ async fn list_summaries_does_not_double_count_payer_who_also_settled() {
     let found = summaries.iter().find(|s| s.id == "t-list-no-double").unwrap();
     // p1 counted once even though both conditions match; p2 not paid.
     assert_eq!(found.paid_count, 1);
+}
+
+#[tokio::test]
+async fn date_roundtrips_through_insert_get_replace() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-date");
+    f.transaction.date = "2026-03-14".into();
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    let got = queries::get_full(&pool, "t-date").await.unwrap();
+    assert_eq!(got.transaction.date, "2026-03-14");
+
+    // Edit-and-save: a new date must persist through replace_full.
+    let mut f2 = got.clone();
+    f2.receipts[0].image_bytes_base64 = String::new();
+    f2.transaction.date = "2026-04-01".into();
+    queries::replace_full(&pool, &f2).await.unwrap();
+
+    let got2 = queries::get_full(&pool, "t-date").await.unwrap();
+    assert_eq!(got2.transaction.date, "2026-04-01");
+}
+
+#[tokio::test]
+async fn list_summaries_returns_date() {
+    let pool = fresh_pool().await;
+    let mut f = sample_full("t-date-sum");
+    f.transaction.date = "2026-05-20".into();
+    queries::insert_full(&pool, &f).await.unwrap();
+
+    let summaries = queries::list_summaries(&pool).await.unwrap();
+    let found = summaries.iter().find(|s| s.id == "t-date-sum").unwrap();
+    assert_eq!(found.date, "2026-05-20");
 }
