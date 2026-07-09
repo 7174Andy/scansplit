@@ -102,3 +102,21 @@ describe("TransactionView paid toggle", () => {
     expect(await screen.findByText(/boom/)).toBeTruthy();
   });
 });
+
+describe("TransactionView date display", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("shows the transaction date", async () => {
+    const full: FullTransaction = {
+      ...sampleFull(),
+      transaction: { ...sampleFull().transaction, date: "2026-07-15" },
+    };
+    vi.spyOn(api, "getTransaction").mockResolvedValue(full);
+    renderView();
+    expect(await screen.findByText(/2026/)).toBeTruthy();
+    expect(screen.getByText(/15/)).toBeTruthy();
+  });
+});
