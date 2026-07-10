@@ -10,6 +10,7 @@ pub struct Transaction {
     pub updated_at: i64,
     #[serde(default)]
     pub paid_by_person_id: Option<String>,
+    pub date: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -35,14 +35,15 @@ pub async fn insert_full(pool: &SqlitePool, full: &FullTransaction) -> AppResult
     let mut tx = pool.begin().await?;
 
     sqlx::query(
-        "INSERT INTO transactions (id, title, currency, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO transactions (id, title, currency, created_at, updated_at, date)
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&full.transaction.id)
     .bind(&full.transaction.title)
     .bind(&full.transaction.currency)
     .bind(full.transaction.created_at)
     .bind(full.transaction.updated_at)
+    .bind(&full.transaction.date)
     .execute(&mut *tx)
     .await?;
 
@@ -163,10 +164,10 @@ pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResul
     sqlx::query("DELETE FROM receipts WHERE transaction_id = ?")
         .bind(&full.transaction.id).execute(&mut *tx).await?;
     sqlx::query(
-        "UPDATE transactions SET title=?, currency=?, updated_at=? WHERE id=?",
+        "UPDATE transactions SET title=?, currency=?, updated_at=?, date=? WHERE id=?",
     )
     .bind(&full.transaction.title).bind(&full.transaction.currency)
-    .bind(full.transaction.updated_at).bind(&full.transaction.id)
+    .bind(full.transaction.updated_at).bind(&full.transaction.date).bind(&full.transaction.id)
     .execute(&mut *tx).await?;
     tx.commit().await?;
 
@@ -212,7 +213,7 @@ pub async fn replace_full(pool: &SqlitePool, full: &FullTransaction) -> AppResul
 
 pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction> {
     let row = sqlx::query(
-        "SELECT id, title, currency, created_at, updated_at, paid_by_person_id
+        "SELECT id, title, currency, created_at, updated_at, paid_by_person_id, date
          FROM transactions WHERE id = ?",
     )
     .bind(id).fetch_optional(pool).await?;
@@ -224,6 +225,7 @@ pub async fn get_full(pool: &SqlitePool, id: &str) -> AppResult<FullTransaction>
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
         paid_by_person_id: row.get("paid_by_person_id"),
+        date: row.get("date"),
     };
 
     let people: Vec<Person> = sqlx::query(
@@ -294,7 +296,7 @@ pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSumma
     // Aggregate people and items in independent subqueries so the joins
     // don't multiply each other (people_count × items_count rows).
     let rows = sqlx::query(
-        "SELECT t.id, t.title, t.currency, t.updated_at,
+        "SELECT t.id, t.title, t.currency, t.updated_at, t.date,
                 COALESCE(p.people_count, 0) AS people_count,
                 COALESCE(p.paid_count, 0)   AS paid_count,
                 COALESCE(i.total_cents, 0)  AS total_cents
@@ -327,6 +329,7 @@ pub async fn list_summaries(pool: &SqlitePool) -> AppResult<Vec<TransactionSumma
         people_count: r.get("people_count"),
         paid_count: r.get("paid_count"),
         total_cents: r.get("total_cents"),
+        date: r.get("date"),
     }).collect())
 }
 
@@ -340,6 +343,7 @@ pub struct TransactionSummary {
     pub people_count: i64,
     pub paid_count: i64,
     pub total_cents: i64,
+    pub date: String,
 }
 
 pub async fn delete(pool: &SqlitePool, id: &str) -> AppResult<Vec<String>> {

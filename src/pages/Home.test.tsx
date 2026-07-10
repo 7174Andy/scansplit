@@ -21,7 +21,7 @@ describe("Home paid indicator", () => {
   it("shows 'Settled' when paidCount equals peopleCount", async () => {
     vi.spyOn(api, "listTransactions").mockResolvedValue([
       {
-        id: "t1", title: "Dinner", currency: "USD", updatedAt: 0,
+        id: "t1", title: "Dinner", currency: "USD", updatedAt: 0, date: "2026-01-01",
         peopleCount: 3, paidCount: 3, totalCents: 9000,
       },
     ]);
@@ -32,7 +32,7 @@ describe("Home paid indicator", () => {
   it("shows 'X of N paid' when partial", async () => {
     vi.spyOn(api, "listTransactions").mockResolvedValue([
       {
-        id: "t2", title: "Lunch", currency: "USD", updatedAt: 0,
+        id: "t2", title: "Lunch", currency: "USD", updatedAt: 0, date: "2026-01-01",
         peopleCount: 3, paidCount: 1, totalCents: 4000,
       },
     ]);
@@ -43,7 +43,7 @@ describe("Home paid indicator", () => {
   it("shows nothing when peopleCount is zero", async () => {
     vi.spyOn(api, "listTransactions").mockResolvedValue([
       {
-        id: "t3", title: "Empty", currency: "USD", updatedAt: 0,
+        id: "t3", title: "Empty", currency: "USD", updatedAt: 0, date: "2026-01-01",
         peopleCount: 0, paidCount: 0, totalCents: 0,
       },
     ]);
@@ -51,5 +51,25 @@ describe("Home paid indicator", () => {
     expect(await screen.findByText("Empty")).toBeTruthy();
     expect(screen.queryByText(/paid/)).toBeNull();
     expect(screen.queryByText("Settled")).toBeNull();
+  });
+});
+
+describe("Home date display", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it("shows the transaction date", async () => {
+    vi.spyOn(api, "listTransactions").mockResolvedValue([
+      {
+        id: "t4", title: "Brunch", currency: "USD", updatedAt: 0, date: "2026-07-15",
+        peopleCount: 2, paidCount: 0, totalCents: 5000,
+      },
+    ]);
+    renderHome();
+    expect(await screen.findByText("Brunch")).toBeTruthy();
+    expect(screen.getByText(/2026/)).toBeTruthy();
+    expect(screen.getByText(/15/)).toBeTruthy();
   });
 });

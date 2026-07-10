@@ -7,6 +7,7 @@ import { computeSplit } from "@/lib/splitMath";
 import { SplitTotalsTable } from "@/components/SplitTotalsTable";
 import { ReceiptViewerDialog } from "@/components/ReceiptViewerDialog";
 import { formatCents } from "@/lib/formatCurrency";
+import { formatDate } from "@/lib/formatDate";
 import { useWizardStore } from "@/store/wizardStore";
 import { Button } from "@/components/ui/button";
 import type { FullTransaction } from "@/lib/types";
@@ -111,6 +112,7 @@ export default function TransactionView() {
         <ArrowLeft className="size-4" /> Home
       </Button>
       <h1 className="mt-4 mb-3 text-3xl font-bold">{full.transaction.title}</h1>
+      <p className="mb-3 text-sm text-muted-foreground">{formatDate(full.transaction.date)}</p>
       <div className="mb-4 flex gap-2">
         <Button variant="outline" onClick={copy}>
           <CopyIcon className="size-4" /> Copy

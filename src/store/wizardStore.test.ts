@@ -158,4 +158,31 @@ describe("wizardStore", () => {
     useWizardStore.getState().removePerson(alice.id);
     expect(useWizardStore.getState().transaction.paidByPersonId).toBeNull();
   });
+
+  it("emptyMeta initializes date to today in YYYY-MM-DD", () => {
+    const d = new Date();
+    const expected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const date = useWizardStore.getState().transaction.date;
+    expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(date).toBe(expected);
+  });
+
+  it("setDate updates the transaction date", () => {
+    useWizardStore.getState().setDate("2026-12-25");
+    expect(useWizardStore.getState().transaction.date).toBe("2026-12-25");
+  });
+
+  it("loadFrom preserves an existing date and toFull returns it", () => {
+    useWizardStore.getState().loadFrom({
+      transaction: {
+        id: "t", title: "x", currency: "USD", createdAt: 0, updatedAt: 0,
+        paidByPersonId: null, date: "2025-11-02",
+      },
+      people: [],
+      receipts: [],
+      items: [],
+    });
+    expect(useWizardStore.getState().transaction.date).toBe("2025-11-02");
+    expect(useWizardStore.getState().toFull().transaction.date).toBe("2025-11-02");
+  });
 });

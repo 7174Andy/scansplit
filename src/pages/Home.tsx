@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Cog, Plus } from "lucide-react";
 import { api } from "@/lib/tauri";
 import { formatCents } from "@/lib/formatCurrency";
+import { formatDate } from "@/lib/formatDate";
 import type { TransactionSummary } from "@/lib/types";
 import { useWizardStore } from "@/store/wizardStore";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ export default function Home() {
                 {r.title}
               </Link>
               <span className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span>{formatDate(r.date)}</span>
                 <span>
                   {formatCents(r.totalCents, r.currency)} · {r.peopleCount} people
                 </span>

@@ -53,7 +53,7 @@ const stubApi: TauriApi = {
     return {
       transaction: {
         id, title: "Stub", currency: "USD", createdAt: 0, updatedAt: 0,
-        paidByPersonId: null,
+        paidByPersonId: null, date: "1970-01-01",
       },
       people: [], receipts: [], items: [],
     };
@@ -72,6 +72,7 @@ const stubApi: TauriApi = {
               p.id === lastSaved!.transaction.paidByPersonId
           ).length,
           totalCents: lastSaved.items.reduce((s, i) => s + i.priceCents, 0),
+          date: lastSaved.transaction.date,
         }]
       : [],
   deleteTransaction: async () => { lastSaved = null; },
