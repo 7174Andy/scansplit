@@ -27,7 +27,7 @@ export function UpdateBanner() {
       <span className="inline-flex items-center gap-2">
         <Download className="size-4" />
         ScanSplit {update.version} is available.
-        {wizardOpen && " It will install once you finish this transaction."}
+        {wizardOpen && " Finish this transaction, then restart to update."}
       </span>
       <span className="inline-flex items-center gap-2">
         {!wizardOpen && (

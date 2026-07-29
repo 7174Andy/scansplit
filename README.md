@@ -24,6 +24,7 @@ No accounts. No server. The only outbound network call is to `api.anthropic.com`
 - **Edit and re-save** — every saved transaction is editable; open it and you re-enter the wizard at Step 2.
 - **Local-first storage** — SQLite database in your OS app-data directory; nothing leaves your machine except the OCR request.
 - **Automatic image preprocessing** — large photos are downscaled to fit Anthropic's 5 MB image cap, and the media type is detected from the file's magic bytes (not the extension).
+- **In-app updates** — new versions are detected on launch and install with one click; never interrupts a transaction in progress. AppImage self-updates on Linux; `.deb`/`.rpm` installs do not.
 
 ## Installing the App
 

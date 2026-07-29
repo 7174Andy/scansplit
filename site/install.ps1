@@ -22,7 +22,11 @@ Write-Host "Downloading $($asset.name)…"
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $out
 
 Write-Host 'Launching installer…'
-Start-Process -FilePath $out -Wait
+$proc = Start-Process -FilePath $out -ArgumentList '/P' -PassThru -Wait
+if ($proc.ExitCode -ne 0) {
+    Write-Error "Installer exited with code $($proc.ExitCode). ScanSplit was not installed."
+    exit 1
+}
 
 Write-Host 'ScanSplit installed.'
 Write-Host "SmartScreen may warn on first launch — click 'More info' -> 'Run anyway' once and it stops asking."

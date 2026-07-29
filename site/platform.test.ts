@@ -33,7 +33,9 @@ const CASES: Array<[string, string, "macos" | "windows" | "linux" | null]> = [
     null,
   ],
   [
-    "iPadOS Safari (desktop-mode UA)",
+    // True desktop-mode iPadOS Safari sends a Macintosh UA indistinguishable
+    // from real macOS by user-agent alone, and will be offered the Mac build.
+    "iPadOS Safari (mobile UA)",
     "Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
     null,
   ],

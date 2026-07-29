@@ -235,11 +235,6 @@ nav a:hover { color: var(--fg); }
 
 .downloads { padding: 48px 0; }
 
-.downloads h2 {
-  font-size: 28px;
-  margin: 0 0 8px;
-}
-
 .downloads > p {
   color: var(--muted);
   margin: 0 0 16px;
