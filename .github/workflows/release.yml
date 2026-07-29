@@ -14,12 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-arm64
+          - platform: macos-universal
             runner: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-intel
-            runner: macos-13
-            args: --target x86_64-apple-darwin
+            args: --target universal-apple-darwin
           - platform: windows-x64
             runner: windows-latest
             args: ''
@@ -65,9 +62,51 @@ jobs:
           sudo cmake --install /tmp/libheif/build
           sudo ldconfig
 
-      - name: Install macOS dependencies
-        if: startsWith(matrix.platform, 'macos')
-        run: brew install libheif pkg-config
+      - name: Build universal libheif from source (macOS)
+        # Homebrew installs arch-native libraries, which cannot link into a
+        # universal binary. libde265 is the HEVC decoder libheif needs to read
+        # .heic files — without it libheif builds but decodes nothing.
+        if: matrix.platform == 'macos-universal'
+        run: |
+          brew install pkg-config cmake
+          git clone --depth 1 --branch v1.0.15 https://github.com/strukturag/libde265.git /tmp/libde265
+          # v1.0.15 declares cmake_minimum_required 3.3.2 and CMake 4 dropped
+          # compatibility below 3.5, so configuring needs the policy override.
+          cmake -S /tmp/libde265 -B /tmp/libde265/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_SDL=OFF
+          cmake --build /tmp/libde265/build --parallel $(sysctl -n hw.ncpu)
+          sudo cmake --install /tmp/libde265/build
+          git clone --depth 1 --branch v1.18.2 https://github.com/strukturag/libheif.git /tmp/libheif
+          # X265 and AOM disable encoders only; ScanSplit never encodes HEIC.
+          # LIBSHARPYUV and GDK_PIXBUF also default ON, and they resolve against
+          # arch-native Homebrew copies that break the x86_64 link — they are
+          # encode and desktop-integration paths this app never uses either.
+          cmake -S /tmp/libheif -B /tmp/libheif/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_PREFIX_PATH=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DWITH_EXAMPLES=OFF \
+            -DBUILD_TESTING=OFF \
+            -DWITH_LIBDE265=ON \
+            -DWITH_X265=OFF \
+            -DWITH_AOM_ENCODER=OFF \
+            -DWITH_AOM_DECODER=OFF \
+            -DWITH_LIBSHARPYUV=OFF \
+            -DWITH_GDK_PIXBUF=OFF
+          cmake --build /tmp/libheif/build --parallel $(sysctl -n hw.ncpu)
+          sudo cmake --install /tmp/libheif/build
+          # Pin pkg-config to what we just installed: /usr/local is searched
+          # after /opt/homebrew, so a stray brew libheif would shadow it. And
+          # the libheif-sys build script refuses a non-host target unless
+          # ALLOW_CROSS is set, which the x86_64 half of a universal build is.
+          echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> "$GITHUB_ENV"
 
       - name: Install Windows dependencies (libheif via vcpkg)
         if: matrix.platform == 'windows-x64'
