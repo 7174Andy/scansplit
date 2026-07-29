@@ -9,7 +9,31 @@ permissions:
   contents: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match tauri.conf.json version
+        run: |
+          tag="${{ github.ref_name }}"
+          # Strip the leading v and any -rc.N pre-release suffix so release
+          # candidates can be tested without bumping the app version.
+          tag_version="${tag#v}"
+          tag_version="${tag_version%%-*}"
+          conf_version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          pkg_version=$(node -p "require('./package.json').version")
+          echo "tag=$tag_version conf=$conf_version pkg=$pkg_version"
+          if [ "$tag_version" != "$conf_version" ]; then
+            echo "::error::Tag $tag implies version $tag_version but src-tauri/tauri.conf.json says $conf_version. The updater compares latest.json against the compiled-in version, so a mismatch means updates silently never fire." >&2
+            exit 1
+          fi
+          if [ "$pkg_version" != "$conf_version" ]; then
+            echo "::error::package.json ($pkg_version) and src-tauri/tauri.conf.json ($conf_version) disagree." >&2
+            exit 1
+          fi
+
   build-tauri:
+    needs: check-version
     strategy:
       fail-fast: false
       matrix:
