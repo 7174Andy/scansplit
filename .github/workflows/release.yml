@@ -151,9 +151,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          src=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
-          if [ -z "$src" ]; then echo "no dmg found" >&2; exit 1; fi
-          cp "$src" "/tmp/ScanSplit-macos-universal.dmg"
+          shopt -s nullglob
+          files=(src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no universal .dmg found in bundle/dmg" >&2
+            exit 1
+          fi
+          if [ ${#files[@]} -gt 1 ]; then
+            echo "::warning::expected one .dmg, found ${#files[@]}: ${files[*]} — using the first"
+          fi
+          cp "${files[0]}" "/tmp/ScanSplit-macos-universal.dmg"
           gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-macos-universal.dmg" --clobber
 
       - name: Upload stable-named copy (Windows)
@@ -162,9 +169,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          src=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
-          if [ -z "$src" ]; then echo "no nsis setup.exe found" >&2; exit 1; fi
-          cp "$src" "/tmp/ScanSplit-windows-x64-setup.exe"
+          shopt -s nullglob
+          files=(src-tauri/target/release/bundle/nsis/*-setup.exe)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no nsis *-setup.exe found in bundle/nsis" >&2
+            exit 1
+          fi
+          if [ ${#files[@]} -gt 1 ]; then
+            echo "::warning::expected one *-setup.exe, found ${#files[@]}: ${files[*]} — using the first"
+          fi
+          cp "${files[0]}" "/tmp/ScanSplit-windows-x64-setup.exe"
           gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-windows-x64-setup.exe" --clobber
 
       - name: Upload stable-named copy (Linux)
@@ -172,7 +186,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          src=$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -1)
-          if [ -z "$src" ]; then echo "no AppImage found" >&2; exit 1; fi
-          cp "$src" "/tmp/ScanSplit-linux-x86_64.AppImage"
+          shopt -s nullglob
+          files=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no .AppImage found in bundle/appimage" >&2
+            exit 1
+          fi
+          if [ ${#files[@]} -gt 1 ]; then
+            echo "::warning::expected one .AppImage, found ${#files[@]}: ${files[*]} — using the first"
+          fi
+          cp "${files[0]}" "/tmp/ScanSplit-linux-x86_64.AppImage"
           gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-linux-x86_64.AppImage" --clobber
