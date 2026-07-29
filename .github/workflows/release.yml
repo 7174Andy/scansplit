@@ -94,7 +94,20 @@ jobs:
         # only, which is the dependency we are trying to get rid of.
         if: matrix.platform == 'linux-x64'
         run: |
+          # Which cmake actually runs matters below, and it is not necessarily
+          # apt's: the runner image ships its own in /usr/local/bin, ahead of
+          # /usr/bin on PATH. Echoed so the log proves the version rather than
+          # us assuming it.
+          cmake --version
           git clone --depth 1 --branch v1.0.15 https://github.com/strukturag/libde265.git /tmp/libde265
+          # No -DCMAKE_POLICY_VERSION_MINIMUM=3.5 here, unlike the macOS step
+          # below: v1.0.15 declares cmake_minimum_required 3.3.2, and only
+          # CMake 4.0 dropped compatibility below 3.5. Both cmakes in play on
+          # this runner are verified under that floor — apt's is 3.22.1 and the
+          # runner image's bundled one is 3.31.6 — so the override is a no-op
+          # today. When the echo above first reports 4.x, this step will fail at
+          # configure with a bare policy error: add the flag here, matching
+          # macOS, and that is the whole fix.
           cmake -S /tmp/libde265 -B /tmp/libde265/build \
             -DCMAKE_INSTALL_PREFIX=/usr/local \
             -DCMAKE_BUILD_TYPE=Release \
