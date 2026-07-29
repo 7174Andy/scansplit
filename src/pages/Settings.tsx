@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, X, Trash2, Pencil } from "lucide-react";
 import { api } from "@/lib/tauri";
+import { checkForUpdate } from "@/lib/updater";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -11,6 +12,7 @@ export default function Settings() {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
 
   useEffect(() => {
     api.getApiKey().then((k) => setHasKey(!!k));
@@ -37,6 +39,14 @@ export default function Settings() {
     } catch (e: any) {
       setErr(String(e?.message ?? e));
     }
+  }
+
+  async function checkUpdates() {
+    setUpdateMsg("Checking…");
+    const update = await checkForUpdate();
+    setUpdateMsg(
+      update ? `Version ${update.version} is available.` : "You're up to date."
+    );
   }
 
   async function backOrSaveAndBack() {
@@ -109,6 +119,18 @@ export default function Settings() {
         </>
       )}
       {err && <p className="mt-2 text-destructive">{err}</p>}
+
+      <div className="mt-8 border-t pt-4">
+        <h2 className="text-sm font-medium">Updates</h2>
+        <div className="mt-2 flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={checkUpdates}>
+            Check for updates
+          </Button>
+          {updateMsg && (
+            <span className="text-[13px] text-muted-foreground">{updateMsg}</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
