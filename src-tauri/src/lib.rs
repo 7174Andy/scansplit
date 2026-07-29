@@ -15,6 +15,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_dir = app.path().app_data_dir().expect("app data dir");
             let db_path = app_dir.join("scansplit.db");
@@ -43,6 +45,7 @@ pub fn run() {
             commands::ocr::scan_receipt,
             commands::ocr::record_code_corrections,
             commands::receipts::get_receipt_image,
+            commands::app_info::is_appimage,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
