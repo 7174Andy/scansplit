@@ -20,8 +20,8 @@ jobs:
           # candidates can be tested without bumping the app version.
           tag_version="${tag#v}"
           tag_version="${tag_version%%-*}"
-          conf_version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          pkg_version=$(node -p "require('./package.json').version")
+          conf_version=$(node -p "require('./src-tauri/tauri.conf.json').version") || { echo "::error::failed to read src-tauri/tauri.conf.json version" >&2; exit 1; }
+          pkg_version=$(node -p "require('./package.json').version") || { echo "::error::failed to read package.json version" >&2; exit 1; }
           echo "tag=$tag_version conf=$conf_version pkg=$pkg_version"
           if [ "$tag_version" != "$conf_version" ]; then
             echo "::error::Tag $tag implies version $tag_version but src-tauri/tauri.conf.json says $conf_version. The updater compares latest.json against the compiled-in version, so a mismatch means updates silently never fire." >&2
