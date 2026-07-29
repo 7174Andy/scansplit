@@ -145,3 +145,34 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Upload stable-named copy (macOS)
+        if: matrix.platform == 'macos-universal'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          src=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          if [ -z "$src" ]; then echo "no dmg found" >&2; exit 1; fi
+          cp "$src" "/tmp/ScanSplit-macos-universal.dmg"
+          gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-macos-universal.dmg" --clobber
+
+      - name: Upload stable-named copy (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          src=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
+          if [ -z "$src" ]; then echo "no nsis setup.exe found" >&2; exit 1; fi
+          cp "$src" "/tmp/ScanSplit-windows-x64-setup.exe"
+          gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-windows-x64-setup.exe" --clobber
+
+      - name: Upload stable-named copy (Linux)
+        if: matrix.platform == 'linux-x64'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          src=$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -1)
+          if [ -z "$src" ]; then echo "no AppImage found" >&2; exit 1; fi
+          cp "$src" "/tmp/ScanSplit-linux-x86_64.AppImage"
+          gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-linux-x86_64.AppImage" --clobber
