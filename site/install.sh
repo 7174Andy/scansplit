@@ -14,25 +14,21 @@ case "$(uname -s)" in
   *) printf 'Unsupported OS: %s\n' "$(uname -s)" >&2; exit 1 ;;
 esac
 
-case "$(uname -m)" in
-  arm64|aarch64) ARCH=aarch64 ;;
-  x86_64|amd64)  ARCH=x64 ;;
-  *) printf 'Unsupported arch: %s\n' "$(uname -m)" >&2; exit 1 ;;
-esac
-
-# Pick asset name pattern
 if [ "$OS" = macos ]; then
-  if [ "$ARCH" = aarch64 ]; then
-    PATTERN='aarch64\.dmg$'
-  else
-    PATTERN='_x64\.dmg$'
-  fi
-elif [ -r /etc/os-release ] && grep -qE '^ID(_LIKE)?=.*(debian|ubuntu)' /etc/os-release; then
-  PATTERN='_amd64\.deb$'
-  LINUX_FORMAT=deb
+  # One universal DMG covers both Apple Silicon and Intel.
+  PATTERN='_universal\.dmg$'
 else
-  PATTERN='_amd64\.AppImage$'
-  LINUX_FORMAT=appimage
+  case "$(uname -m)" in
+    x86_64|amd64) ;;
+    *) printf 'Linux builds are x86_64 only (detected %s).\n' "$(uname -m)" >&2; exit 1 ;;
+  esac
+  if [ -r /etc/os-release ] && grep -qE '^ID(_LIKE)?=.*(debian|ubuntu)' /etc/os-release; then
+    PATTERN='_amd64\.deb$'
+    LINUX_FORMAT=deb
+  else
+    PATTERN='_amd64\.AppImage$'
+    LINUX_FORMAT=appimage
+  fi
 fi
 
 ASSET_URL=$(curl -fsSL "$API_URL" \

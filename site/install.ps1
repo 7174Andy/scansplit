@@ -11,9 +11,9 @@ if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
 }
 
 $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest"
-$asset = $release.assets | Where-Object { $_.name -like '*_x64_en-US.msi' } | Select-Object -First 1
+$asset = $release.assets | Where-Object { $_.name -like '*_x64-setup.exe' } | Select-Object -First 1
 if (-not $asset) {
-    Write-Error "No .msi asset found in latest release. Has a release been published?"
+    Write-Error "No installer found in latest release. Has a release been published?"
     exit 1
 }
 
@@ -22,7 +22,7 @@ Write-Host "Downloading $($asset.name)…"
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $out
 
 Write-Host 'Launching installer…'
-Start-Process msiexec.exe -ArgumentList "/i `"$out`" /qb" -Wait
+Start-Process -FilePath $out -Wait
 
 Write-Host 'ScanSplit installed.'
 Write-Host "SmartScreen may warn on first launch — click 'More info' -> 'Run anyway' once and it stops asking."

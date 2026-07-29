@@ -35,13 +35,13 @@ Grab the build for your platform from the [releases page](https://7174andy.githu
 
 The downloaded `.dmg` isn't notarized by Apple, so Gatekeeper blocks it on first open with *"ScanSplit can't be opened because Apple cannot check it for malicious software."* To run it anyway:
 
-1. Download the `.dmg` for your chip — **Apple Silicon** (M-series) uses the `aarch64` build, **Intel** uses the `x64` build — then drag **ScanSplit** into your **Applications** folder.
+1. Download `ScanSplit-macos-universal.dmg` — one build runs on both Apple Silicon and Intel — then drag **ScanSplit** into your **Applications** folder.
 2. **macOS 14 (Sonoma) and earlier:** right-click (or Control-click) ScanSplit in Applications → **Open** → **Open** in the dialog. macOS remembers the choice, so later launches are normal.
 3. **macOS 15 (Sequoia) and later:** double-click once and dismiss the warning, then go to **System Settings → Privacy & Security**, scroll to the message naming ScanSplit, and click **Open Anyway**.
 
 ### First launch on Windows
 
-SmartScreen shows *"Windows protected your PC"* for the unsigned `.msi`. Click **More info → Run anyway** to install.
+SmartScreen shows *"Windows protected your PC"* for the unsigned installer. Click **More info → Run anyway** to install. The default download is the `-setup.exe` (NSIS) installer; an `.msi` is also published in each release if you need it.
 
 ### First launch on Linux
 
