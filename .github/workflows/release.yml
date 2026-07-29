@@ -74,17 +74,68 @@ jobs:
         if: matrix.platform == 'linux-x64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev pkg-config cmake libde265-dev libx265-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev pkg-config cmake
 
-      - name: Build libheif from source (Linux)
-        # Ubuntu's libheif-dev is older than what libheif-sys 3.x requires (>= 1.18).
+      - name: Build static libheif from source (Linux)
+        # Built from source for two reasons, neither optional:
+        #   1. Version floor. Ubuntu 22.04's libheif-dev is older than what
+        #      libheif-sys 3.x requires (>= 1.18).
+        #   2. Static linkage. v0.1.0's .deb declared libheif.so.1 as a needed
+        #      library, bundled no copy of it, and listed only
+        #      libwebkit2gtk-4.1-0 and libgtk-3-0 in Depends — so it installed
+        #      and then failed at ld.so load time on any clean machine. A
+        #      from-source library under /usr/local is invisible to dpkg, so no
+        #      distro dependency can ever describe it; linking it in removes the
+        #      dependency rather than shipping it alongside. Same call the macOS
+        #      step makes below, and the Windows job with x64-windows-static-md.
+        # libde265 is the HEVC decoder libheif needs to read .heic files —
+        # without it libheif builds but decodes nothing. It comes from source
+        # rather than apt's libde265-dev because apt ships a shared library
+        # only, which is the dependency we are trying to get rid of.
         if: matrix.platform == 'linux-x64'
         run: |
+          git clone --depth 1 --branch v1.0.15 https://github.com/strukturag/libde265.git /tmp/libde265
+          cmake -S /tmp/libde265 -B /tmp/libde265/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DENABLE_SDL=OFF
+          cmake --build /tmp/libde265/build --parallel $(nproc)
+          sudo cmake --install /tmp/libde265/build
           git clone --depth 1 --branch v1.18.2 https://github.com/strukturag/libheif.git /tmp/libheif
-          cmake -S /tmp/libheif -B /tmp/libheif/build -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release -DWITH_EXAMPLES=OFF -DBUILD_TESTING=OFF
+          # X265 and AOM disable the HEVC encoder and AVIF; ScanSplit only ever
+          # decodes HEIC. Left ON they would resolve against apt's shared
+          # libx265/libaom and put an external .so dependency straight back.
+          # LIBSHARPYUV is an encode-side chroma helper, and GDK_PIXBUF builds a
+          # loadable gdk-pixbuf module that has no meaning in a static build and
+          # that this app never loads — gdk-pixbuf-2.0 is present via
+          # libgtk-3-dev, so both must be turned off explicitly.
+          cmake -S /tmp/libheif -B /tmp/libheif/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_PREFIX_PATH=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DWITH_EXAMPLES=OFF \
+            -DBUILD_TESTING=OFF \
+            -DWITH_LIBDE265=ON \
+            -DWITH_X265=OFF \
+            -DWITH_AOM_ENCODER=OFF \
+            -DWITH_AOM_DECODER=OFF \
+            -DWITH_LIBSHARPYUV=OFF \
+            -DWITH_GDK_PIXBUF=OFF
           cmake --build /tmp/libheif/build --parallel $(nproc)
           sudo cmake --install /tmp/libheif/build
-          sudo ldconfig
+          # LIBHEIF_STATIC makes pkg-config emit Libs.private for libheif only,
+          # where it records the -lde265 and -lstdc++ it needs once linked in
+          # statically. Deliberately not PKG_CONFIG_ALL_STATIC (which macOS
+          # uses): on Linux that also reaches libdbus-sys, which then asks for a
+          # static dbus-1 and emits -lsystemd, and libsystemd ships no .so
+          # symlink without libsystemd-dev — the link fails with
+          # "cannot find -lsystemd". Only libheif needs static resolution here.
+          # No PKG_CONFIG_PATH pin is needed either, unlike macOS: pkg-config's
+          # default search path already puts /usr/local/lib/pkgconfig ahead of
+          # /usr/lib. And no ldconfig, because nothing shared gets installed.
+          echo "LIBHEIF_STATIC=1" >> "$GITHUB_ENV"
 
       - name: Build static universal libheif from source (macOS)
         # Built from source for two reasons, neither optional:
