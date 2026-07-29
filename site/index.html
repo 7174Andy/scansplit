@@ -17,7 +17,7 @@
     <nav>
       <a href="#install">Install</a>
       <a href="#features">Features</a>
-      <a href="#downloads">Downloads</a>
+      <a href="#downloads">All platforms</a>
       <a href="https://github.com/7174Andy/scansplit" target="_blank" rel="noopener">GitHub</a>
     </nav>
   </header>
@@ -26,6 +26,21 @@
     <section class="hero">
       <h1>Split receipts fairly. Locally.</h1>
       <p class="tagline">Snap a receipt, assign items to people, get an exact per-person total — without an account, a cloud, or a paywall.</p>
+      <div class="download" id="download">
+        <a class="dl-btn" data-os="macos"
+           href="https://github.com/7174Andy/scansplit/releases/latest/download/ScanSplit-macos-universal.dmg">
+          Download for macOS
+        </a>
+        <a class="dl-btn" data-os="windows"
+           href="https://github.com/7174Andy/scansplit/releases/latest/download/ScanSplit-windows-x64-setup.exe">
+          Download for Windows
+        </a>
+        <a class="dl-btn" data-os="linux"
+           href="https://github.com/7174Andy/scansplit/releases/latest/download/ScanSplit-linux-x86_64.AppImage">
+          Download for Linux
+        </a>
+      </div>
+      <p class="dl-sub" id="dl-sub">Free and local-first. Works on macOS, Windows, and Linux.</p>
     </section>
 
     <section id="install" class="install">
@@ -89,21 +104,26 @@
     </section>
 
     <section id="downloads" class="downloads">
-      <h2>Direct downloads</h2>
-      <p>Prefer to click instead? Pick your platform.</p>
-      <table>
-        <thead>
-          <tr><th>Platform</th><th>File</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>macOS (Apple Silicon)</td><td><a class="dl" data-pattern="aarch64\.dmg$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
-          <tr><td>macOS (Intel)</td><td><a class="dl" data-pattern="_x64\.dmg$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
-          <tr><td>Windows (MSI)</td><td><a class="dl" data-pattern="_x64_en-US\.msi$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
-          <tr><td>Windows (NSIS)</td><td><a class="dl" data-pattern="_x64-setup\.exe$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
-          <tr><td>Linux (Debian/Ubuntu)</td><td><a class="dl" data-pattern="_amd64\.deb$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
-          <tr><td>Linux (AppImage)</td><td><a class="dl" data-pattern="_amd64\.AppImage$" href="https://github.com/7174Andy/scansplit/releases/latest">Latest release →</a></td></tr>
-        </tbody>
-      </table>
+      <details>
+        <summary>Other platforms and architectures</summary>
+        <table>
+          <thead>
+            <tr><th>Platform</th><th>File</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>macOS (Intel &amp; Apple Silicon)</td><td><code>ScanSplit_*_universal.dmg</code></td></tr>
+            <tr><td>Windows (installer, recommended)</td><td><code>ScanSplit_*_x64-setup.exe</code></td></tr>
+            <tr><td>Windows (MSI)</td><td><code>ScanSplit_*_x64_en-US.msi</code></td></tr>
+            <tr><td>Linux (AppImage, self-updating)</td><td><code>ScanSplit_*_amd64.AppImage</code></td></tr>
+            <tr><td>Linux (Debian/Ubuntu)</td><td><code>ScanSplit_*_amd64.deb</code></td></tr>
+            <tr><td>Linux (Fedora/RHEL)</td><td><code>ScanSplit-*.x86_64.rpm</code></td></tr>
+          </tbody>
+        </table>
+        <p class="note">
+          Every file above is attached to the
+          <a href="https://github.com/7174Andy/scansplit/releases/latest">latest release</a>.
+        </p>
+      </details>
       <p id="first-run" class="note">
         Bundles are unsigned. <strong>macOS:</strong> right-click → <em>Open</em> the first time (or use the install script, which strips the quarantine flag for you). <strong>Windows:</strong> click <em>More info</em> → <em>Run anyway</em> when SmartScreen warns.
       </p>
@@ -114,7 +134,9 @@
     <p><a href="https://github.com/7174Andy/scansplit">github.com/7174Andy/scansplit</a></p>
   </footer>
 
-  <script>
+  <script type="module">
+    import { detectOS } from './platform.js';
+
     document.querySelectorAll('.copy').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var target = document.getElementById(btn.dataset.target);
@@ -126,20 +148,15 @@
       });
     });
 
-    fetch('https://api.github.com/repos/7174Andy/scansplit/releases/latest')
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (release) {
-        if (!release || !release.assets) return;
-        document.querySelectorAll('a.dl').forEach(function (a) {
-          var pattern = new RegExp(a.dataset.pattern);
-          var asset = release.assets.find(function (x) { return pattern.test(x.name); });
-          if (asset) {
-            a.href = asset.browser_download_url;
-            a.textContent = asset.name;
-          }
-        });
-      })
-      .catch(function () {});
+    var os = detectOS(navigator.userAgent);
+    if (os) {
+      document.querySelectorAll('.dl-btn').forEach(function (a) {
+        if (a.dataset.os !== os) a.remove();
+      });
+      var label = { macos: 'macOS', windows: 'Windows', linux: 'Linux' }[os];
+      document.getElementById('dl-sub').textContent =
+        'Detected ' + label + '. Other platforms are listed below.';
+    }
   </script>
 </body>
 </html>
