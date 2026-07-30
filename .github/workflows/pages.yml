@@ -9,6 +9,13 @@ on:
       - 'share.html'
       - 'vite.share.config.ts'
       - 'package.json'
+      # The share page's CSS is src/globals.css processed by Tailwind, so a
+      # change to either config alters the deployed bundle without touching
+      # anything above. pnpm-lock.yaml covers a dependency bump on its own,
+      # which the build consumes via --frozen-lockfile.
+      - 'tailwind.config.ts'
+      - 'postcss.config.js'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
