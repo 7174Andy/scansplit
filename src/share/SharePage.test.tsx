@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { SharePage } from "./SharePage";
 import { encodeSharePayload, type SharePayload } from "@/lib/sharePayload";
 import { computeSplit } from "@/lib/splitMath";
@@ -60,14 +60,37 @@ describe("SharePage", () => {
     }
   });
 
-  // The load-bearing test: the page must agree with the desktop app's math.
-  it("renders totals identical to computeSplit on the same inputs", () => {
+  // Narrower than it sounds: this only proves the page renders the same SET
+  // of total strings computeSplit produces. It would still pass if a bug
+  // swapped which name is paired with which total, since the set of
+  // rendered strings would be unchanged. See the next test for that.
+  it("renders the same set of totals computeSplit produces", () => {
     const { items, people } = reconstruct(PAYLOAD);
     const expected = computeSplit(items, people);
     render(<SharePage fragment={encodeSharePayload(PAYLOAD)} />);
     for (const pt of expected.perPerson) {
       const text = formatCents(pt.totalCents, PAYLOAD.c);
       expect(screen.getAllByText(text).length).toBeGreaterThan(0);
+    }
+  });
+
+  // The load-bearing test: the page must agree with the desktop app's math,
+  // AND attach each total to the correct person. SplitTotalsTable renders
+  // one <details> per person, with their name and total both inside its
+  // <summary>, so scoping the total lookup to that person's own <details>
+  // catches a name/total mis-pairing (e.g. an off-by-one in how personNames
+  // is zipped against split.perPerson) that a page-wide query would miss.
+  it("pairs each person with their own correct total", () => {
+    const { items, people } = reconstruct(PAYLOAD);
+    const expected = computeSplit(items, people);
+    render(<SharePage fragment={encodeSharePayload(PAYLOAD)} />);
+
+    for (const pt of expected.perPerson) {
+      const name = PAYLOAD.p[Number(pt.personId.slice(1))];
+      const total = formatCents(pt.totalCents, PAYLOAD.c);
+      const row = screen.getByText(new RegExp(`^${name}$`)).closest("details")!;
+      expect(row).toBeTruthy();
+      expect(within(row as HTMLElement).getByText(total)).toBeTruthy();
     }
   });
 });
