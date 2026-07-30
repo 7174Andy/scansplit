@@ -3,7 +3,13 @@ name: Pages
 on:
   push:
     branches: [main]
-    paths: ['site/**', '.github/workflows/pages.yml']
+    paths:
+      - 'site/**'
+      - 'src/**'
+      - 'share.html'
+      - 'vite.share.config.ts'
+      - 'package.json'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,11 +29,40 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the share page
+        run: pnpm build:share
+
+      - name: Stage the site with the share page inside it
+        run: |
+          # share.html becomes share/index.html so the URL is /share/ rather
+          # than /share.html. base:'./' makes the HTML request ./assets/*, so
+          # assets must sit beside it under share/.
+          mkdir -p _pages
+          cp -R site/. _pages/
+          mkdir -p _pages/share
+          cp dist-share/share.html _pages/share/index.html
+          cp -R dist-share/assets _pages/share/assets
+          test -f _pages/share/index.html || { echo "::error::share/index.html missing" >&2; exit 1; }
+          test -d _pages/share/assets   || { echo "::error::share/assets missing" >&2; exit 1; }
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _pages
       - id: deployment
         uses: actions/deploy-pages@v4
