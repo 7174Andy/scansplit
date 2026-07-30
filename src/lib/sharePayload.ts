@@ -18,6 +18,27 @@ export interface SharePayload {
 
 export type DecodeError = "empty" | "corrupt" | "version";
 
+/**
+ * The largest payload the spec measured was 1175 chars (150 items, 8 people);
+ * this is ~13x that, so it cannot clip a real split.
+ *
+ * It exists to bound inflation. fflate cannot be asked to stop at a size: the
+ * `out` option needs the length known in advance and SILENTLY TRUNCATES rather
+ * than erroring, which would turn a hostile link into a wrong bill instead of a
+ * rejected one. Capping the input is the only honest lever. fflate@0.8.3 tops
+ * out around 768x (a 1376-char fragment inflates to 1 MiB; 21,846 chars to
+ * 16 MiB), so 16 KiB in bounds output near 12 MiB — allocated once and
+ * discarded. Uncapped, a multi-megabyte URL (which Chromium accepts) reaches
+ * ~1 GB and hangs or OOMs the recipient's tab.
+ */
+const MAX_FRAGMENT_CHARS = 16_384;
+
+/** Anything outside this throws RangeError inside Intl.NumberFormat. */
+const CURRENCY_RE = /^[A-Za-z]{3}$/;
+
+/** Anything else renders as the literal text "Invalid Date". */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 type DecodeResult =
   | { ok: true; payload: SharePayload }
   | { ok: false; error: DecodeError };
@@ -49,6 +70,8 @@ export function encodeSharePayload(payload: SharePayload): string {
 export function decodeSharePayload(fragment: string): DecodeResult {
   const trimmed = fragment.trim();
   if (trimmed === "") return { ok: false, error: "empty" };
+  // Checked before decoding, so the cap bounds every allocation downstream.
+  if (trimmed.length > MAX_FRAGMENT_CHARS) return { ok: false, error: "corrupt" };
 
   let parsed: unknown;
   try {
@@ -71,7 +94,6 @@ export function decodeSharePayload(fragment: string): DecodeResult {
 
   if (
     typeof o.t !== "string" ||
-    typeof o.c !== "string" ||
     typeof o.d !== "string" ||
     !Array.isArray(o.p) ||
     !Array.isArray(o.i) ||
@@ -79,6 +101,22 @@ export function decodeSharePayload(fragment: string): DecodeResult {
   ) {
     return { ok: false, error: "corrupt" };
   }
+
+  // `c` and `d` are not merely read — they are handed to formatters that throw
+  // or emit garbage on a malformed value, and the render happens too late to
+  // recover cleanly. Both are validated for SHAPE, not just type: a bad `c`
+  // makes Intl.NumberFormat throw a RangeError out of SplitTotalsTable's
+  // render, and a bad `d` shows the recipient the literal text "Invalid Date".
+  if (typeof o.c !== "string" || !CURRENCY_RE.test(o.c)) {
+    return { ok: false, error: "corrupt" };
+  }
+  if (!ISO_DATE_RE.test(o.d)) return { ok: false, error: "corrupt" };
+
+  // No people but at least one item cannot be rendered honestly: computeSplit
+  // returns `{ perPerson: [], totalCents: 0 }`, so the page would show an empty
+  // table and "Total $0.00" while the payload holds real money. Being
+  // confidently wrong about a bill is worse than admitting the link is broken.
+  if (o.p.length === 0 && o.i.length > 0) return { ok: false, error: "corrupt" };
 
   const peopleCount = o.p.length;
   for (const raw of o.i) {
