@@ -1,5 +1,6 @@
 node_modules
 dist
+dist-share
 .vite
 src-tauri/target
 src-tauri/Cargo.lock
@@ -9,3 +10,4 @@ src-tauri/gen
 *.log
 test-results
 playwright-report
+*.tsbuildinfo

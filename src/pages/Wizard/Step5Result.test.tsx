@@ -37,3 +37,25 @@ describe("Step5Result date picker", () => {
     expect(useWizardStore.getState().transaction.date).toBe("2026-01-20");
   });
 });
+
+describe("Step5Result share caveat", () => {
+  beforeEach(() => {
+    useWizardStore.getState().reset();
+  });
+  afterEach(() => cleanup());
+
+  // The spec requires the bearer-token caveat "near the copy button". It shipped
+  // to the README only, so the Copy button's meaning changed without saying so:
+  // a user who had been pasting into a private note was now minting a permanent
+  // public URL of everyone's name and amount.
+  it("warns next to Copy that the link is public and unrevocable", () => {
+    render(
+      <MemoryRouter>
+        <Step5Result onBack={() => {}} />
+      </MemoryRouter>
+    );
+    const warning = screen.getByText(/anyone can open/i);
+    expect(warning).toBeTruthy();
+    expect(warning.textContent).toMatch(/can'?t be revoked/i);
+  });
+});
