@@ -148,6 +148,11 @@ export default function TransactionView() {
           <Trash2 className="size-4" /> Delete
         </Button>
       </div>
+      {/* See the matching note in Step5Result: the caveat belongs next to the
+          button that creates the link, where the user is deciding. */}
+      <p className="mb-3 text-sm text-muted-foreground">
+        Copy includes a link anyone can open — it can&apos;t be revoked.
+      </p>
       {err && <p className="mb-2 text-destructive">{err}</p>}
       {payerName && (
         <p className="mb-2 text-sm text-muted-foreground">

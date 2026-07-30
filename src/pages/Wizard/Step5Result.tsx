@@ -140,6 +140,12 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
           <Check className="size-4" /> {saving ? "Saving…" : "Save"}
         </Button>
       </div>
+      {/* Copy silently changed meaning when share links were added: it now
+          produces a public URL carrying every participant's name and amount.
+          That decision gets made here, at the button — not in the README. */}
+      <p className="mt-2 text-sm text-muted-foreground">
+        Copy includes a link anyone can open — it can&apos;t be revoked.
+      </p>
       {err && <p className="mt-2 text-destructive">{err}</p>}
     </div>
   );
