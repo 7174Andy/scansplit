@@ -74,6 +74,22 @@ describe("decode failures", () => {
     expect(decodeSharePayload(future)).toEqual({ ok: false, error: "version" });
   });
 
+  it("reports corrupt (not version) for a JSON array root", () => {
+    const bad = encodeSharePayload([1, 2, 3] as unknown as SharePayload);
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt (not version) for an object with no v field at all", () => {
+    const bad = encodeSharePayload({
+      t: "x",
+      c: "USD",
+      d: "2026-07-29",
+      p: [],
+      i: [],
+    } as unknown as SharePayload);
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
   it("reports corrupt when an assigned index is out of range", () => {
     const bad = encodeSharePayload({
       ...FIXTURE,
@@ -100,6 +116,80 @@ describe("decode failures", () => {
 
   it("reports corrupt when required fields are missing", () => {
     const bad = encodeSharePayload({ v: 1 } as unknown as SharePayload);
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when c is not a string", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      c: 123 as unknown as string,
+    });
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when d is not a string", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      d: 20260729 as unknown as string,
+    });
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when p is not an array", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      p: "Andy" as unknown as string[],
+    });
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when i is not an array", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      i: "not an array" as unknown as SharePayload["i"],
+    });
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when p contains a non-string", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      p: ["Andy", 5 as unknown as string, "Cara"],
+    });
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when an item is not itself an array", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      i: ["not an item tuple" as unknown as SharePayload["i"][number]],
+    });
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when an item tuple has the wrong length", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      i: [["Pizza", 1000, 0] as unknown as SharePayload["i"][number]],
+    });
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when an item name is not a string", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      i: [[123, 1000, 0, []] as unknown as SharePayload["i"][number]],
+    });
+    expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
+  });
+
+  it("reports corrupt when an item's assigned field is not an array", () => {
+    const bad = encodeSharePayload({
+      ...FIXTURE,
+      i: [
+        ["Pizza", 1000, 0, "nope"] as unknown as SharePayload["i"][number],
+      ],
+    });
     expect(decodeSharePayload(bad)).toEqual({ ok: false, error: "corrupt" });
   });
 });

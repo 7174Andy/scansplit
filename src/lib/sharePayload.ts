@@ -57,13 +57,16 @@ export function decodeSharePayload(fragment: string): DecodeResult {
     return { ok: false, error: "corrupt" };
   }
 
-  if (typeof parsed !== "object" || parsed === null) {
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     return { ok: false, error: "corrupt" };
   }
   const o = parsed as Record<string, unknown>;
 
-  // Version is checked before shape, so a future format gets the accurate
-  // message instead of being reported as corrupt.
+  // A missing `v` is garbage, not a future format. Only an explicitly present
+  // but unrecognised version earns the "newer version" message. Version is
+  // checked before shape, so a future format gets the accurate message
+  // instead of being reported as corrupt.
+  if (!("v" in o)) return { ok: false, error: "corrupt" };
   if (o.v !== 1) return { ok: false, error: "version" };
 
   if (
