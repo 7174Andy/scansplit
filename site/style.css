@@ -235,11 +235,6 @@ nav a:hover { color: var(--fg); }
 
 .downloads { padding: 48px 0; }
 
-.downloads h2 {
-  font-size: 28px;
-  margin: 0 0 8px;
-}
-
 .downloads > p {
   color: var(--muted);
   margin: 0 0 16px;
@@ -284,4 +279,41 @@ footer {
   .grid { grid-template-columns: 1fr; }
   .hero h1 { font-size: 32px; }
   nav { gap: 12px; }
+}
+
+.download {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.dl-btn {
+  display: inline-block;
+  padding: 12px 22px;
+  border-radius: 8px;
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.dl-btn:hover { opacity: 0.85; }
+
+.dl-sub {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.downloads details { margin-top: 8px; }
+
+.downloads summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 8px 0;
 }

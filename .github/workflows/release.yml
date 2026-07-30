@@ -9,17 +9,48 @@ permissions:
   contents: write
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match tauri.conf.json version
+        run: |
+          tag="${{ github.ref_name }}"
+          # Strip the leading v and any -rc.N pre-release suffix so release
+          # candidates can be tested without bumping the app version.
+          tag_version="${tag#v}"
+          tag_version="${tag_version%%-*}"
+          conf_version=$(node -p "require('./src-tauri/tauri.conf.json').version") || { echo "::error::failed to read src-tauri/tauri.conf.json version" >&2; exit 1; }
+          pkg_version=$(node -p "require('./package.json').version") || { echo "::error::failed to read package.json version" >&2; exit 1; }
+          # Parsed without a TOML dependency: tauri.conf.json's version field is
+          # documented as optional with Cargo.toml as the fallback used by
+          # generate_context!(), so if a future cleanup ever drops the config
+          # field, silent drift here would compile the wrong version into the
+          # binary and updates would stop firing with this guard reporting green.
+          cargo_version=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1) || { echo "::error::failed to read src-tauri/Cargo.toml version" >&2; exit 1; }
+          echo "tag=$tag_version conf=$conf_version pkg=$pkg_version cargo=$cargo_version"
+          if [ "$tag_version" != "$conf_version" ]; then
+            echo "::error::Tag $tag implies version $tag_version but src-tauri/tauri.conf.json says $conf_version. The updater compares latest.json against the compiled-in version, so a mismatch means updates silently never fire." >&2
+            exit 1
+          fi
+          if [ "$pkg_version" != "$conf_version" ]; then
+            echo "::error::package.json ($pkg_version) and src-tauri/tauri.conf.json ($conf_version) disagree." >&2
+            exit 1
+          fi
+          if [ "$cargo_version" != "$conf_version" ]; then
+            echo "::error::src-tauri/Cargo.toml ($cargo_version) and src-tauri/tauri.conf.json ($conf_version) disagree." >&2
+            exit 1
+          fi
+
   build-tauri:
+    needs: check-version
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-arm64
+          - platform: macos-universal
             runner: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-intel
-            runner: macos-13
-            args: --target x86_64-apple-darwin
+            args: --target universal-apple-darwin
           - platform: windows-x64
             runner: windows-latest
             args: ''
@@ -53,21 +84,151 @@ jobs:
         if: matrix.platform == 'linux-x64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev pkg-config cmake libde265-dev libx265-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev pkg-config cmake
 
-      - name: Build libheif from source (Linux)
-        # Ubuntu's libheif-dev is older than what libheif-sys 3.x requires (>= 1.18).
+      - name: Build static libheif from source (Linux)
+        # Built from source for two reasons, neither optional:
+        #   1. Version floor. Ubuntu 22.04's libheif-dev is older than what
+        #      libheif-sys 3.x requires (>= 1.18).
+        #   2. Static linkage. v0.1.0's .deb declared libheif.so.1 as a needed
+        #      library, bundled no copy of it, and listed only
+        #      libwebkit2gtk-4.1-0 and libgtk-3-0 in Depends — so it installed
+        #      and then failed at ld.so load time on any clean machine. A
+        #      from-source library under /usr/local is invisible to dpkg, so no
+        #      distro dependency can ever describe it; linking it in removes the
+        #      dependency rather than shipping it alongside. Same call the macOS
+        #      step makes below, and the Windows job with x64-windows-static-md.
+        # libde265 is the HEVC decoder libheif needs to read .heic files —
+        # without it libheif builds but decodes nothing. It comes from source
+        # rather than apt's libde265-dev because apt ships a shared library
+        # only, which is the dependency we are trying to get rid of.
         if: matrix.platform == 'linux-x64'
         run: |
+          # Which cmake actually runs matters below, and it is not necessarily
+          # apt's: the runner image ships its own in /usr/local/bin, ahead of
+          # /usr/bin on PATH. Echoed so the log proves the version rather than
+          # us assuming it.
+          cmake --version
+          git clone --depth 1 --branch v1.0.15 https://github.com/strukturag/libde265.git /tmp/libde265
+          # No -DCMAKE_POLICY_VERSION_MINIMUM=3.5 here, unlike the macOS step
+          # below: v1.0.15 declares cmake_minimum_required 3.3.2, and only
+          # CMake 4.0 dropped compatibility below 3.5. Both cmakes in play on
+          # this runner are verified under that floor — apt's is 3.22.1 and the
+          # runner image's bundled one is 3.31.6 — so the override is a no-op
+          # today. When the echo above first reports 4.x, this step will fail at
+          # configure with a bare policy error: add the flag here, matching
+          # macOS, and that is the whole fix.
+          # -DCMAKE_POSITION_INDEPENDENT_CODE=ON: Ubuntu's GCC already defaults
+          # to --enable-default-pie, so this is a no-op on the arm64 spike that
+          # passed, but CI builds amd64 — where a non-PIC static archive
+          # failing to link into Rust's PIE executable is the most common
+          # failure mode. Cheap insurance against that platform difference.
+          cmake -S /tmp/libde265 -B /tmp/libde265/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DENABLE_SDL=OFF
+          cmake --build /tmp/libde265/build --parallel $(nproc)
+          sudo cmake --install /tmp/libde265/build
           git clone --depth 1 --branch v1.18.2 https://github.com/strukturag/libheif.git /tmp/libheif
-          cmake -S /tmp/libheif -B /tmp/libheif/build -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release -DWITH_EXAMPLES=OFF -DBUILD_TESTING=OFF
+          # X265 and AOM disable the HEVC encoder and AVIF; ScanSplit only ever
+          # decodes HEIC. Left ON they would resolve against apt's shared
+          # libx265/libaom and put an external .so dependency straight back.
+          # LIBSHARPYUV is an encode-side chroma helper, and GDK_PIXBUF builds a
+          # loadable gdk-pixbuf module that has no meaning in a static build and
+          # that this app never loads — gdk-pixbuf-2.0 is present via
+          # libgtk-3-dev, so both must be turned off explicitly.
+          cmake -S /tmp/libheif -B /tmp/libheif/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_PREFIX_PATH=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DWITH_EXAMPLES=OFF \
+            -DBUILD_TESTING=OFF \
+            -DWITH_LIBDE265=ON \
+            -DWITH_X265=OFF \
+            -DWITH_AOM_ENCODER=OFF \
+            -DWITH_AOM_DECODER=OFF \
+            -DWITH_LIBSHARPYUV=OFF \
+            -DWITH_GDK_PIXBUF=OFF
           cmake --build /tmp/libheif/build --parallel $(nproc)
           sudo cmake --install /tmp/libheif/build
-          sudo ldconfig
+          # LIBHEIF_STATIC makes pkg-config emit Libs.private for libheif only,
+          # where it records the -lde265 and -lstdc++ it needs once linked in
+          # statically. Deliberately not PKG_CONFIG_ALL_STATIC (which macOS
+          # uses): on Linux that also reaches libdbus-sys, which then asks for a
+          # static dbus-1 and emits -lsystemd, and libsystemd ships no .so
+          # symlink without libsystemd-dev — the link fails with
+          # "cannot find -lsystemd". Only libheif needs static resolution here.
+          # No PKG_CONFIG_PATH pin is needed either, unlike macOS: pkg-config's
+          # default search path already puts /usr/local/lib/pkgconfig ahead of
+          # /usr/lib. And no ldconfig, because nothing shared gets installed.
+          echo "LIBHEIF_STATIC=1" >> "$GITHUB_ENV"
 
-      - name: Install macOS dependencies
-        if: startsWith(matrix.platform, 'macos')
-        run: brew install libheif pkg-config
+      - name: Build static universal libheif from source (macOS)
+        # Built from source for two reasons, neither optional:
+        #   1. Dual-arch. Homebrew installs arch-native libraries, which cannot
+        #      link into a universal binary.
+        #   2. Static linkage. v0.1.0 linked an absolute
+        #      /opt/homebrew/opt/libheif/lib/libheif.1.dylib and bundled no
+        #      Frameworks, so it could not launch on a Mac without Homebrew's
+        #      libheif at that exact path. Linking the library in removes the
+        #      runtime dependency rather than shipping it alongside — the same
+        #      call the Windows job makes with x64-windows-static-md below.
+        # libde265 is the HEVC decoder libheif needs to read .heic files —
+        # without it libheif builds but decodes nothing.
+        if: matrix.platform == 'macos-universal'
+        run: |
+          brew install pkg-config cmake
+          git clone --depth 1 --branch v1.0.15 https://github.com/strukturag/libde265.git /tmp/libde265
+          # v1.0.15 declares cmake_minimum_required 3.3.2 and CMake 4 dropped
+          # compatibility below 3.5, so configuring needs the policy override.
+          cmake -S /tmp/libde265 -B /tmp/libde265/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DENABLE_SDL=OFF
+          cmake --build /tmp/libde265/build --parallel $(sysctl -n hw.ncpu)
+          sudo cmake --install /tmp/libde265/build
+          git clone --depth 1 --branch v1.18.2 https://github.com/strukturag/libheif.git /tmp/libheif
+          # X265 and AOM disable encoders only; ScanSplit never encodes HEIC.
+          # LIBSHARPYUV and GDK_PIXBUF also default ON, and they resolve against
+          # arch-native Homebrew copies that break the x86_64 link — they are
+          # encode and desktop-integration paths this app never uses either.
+          cmake -S /tmp/libheif -B /tmp/libheif/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_PREFIX_PATH=/usr/local \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DWITH_EXAMPLES=OFF \
+            -DBUILD_TESTING=OFF \
+            -DWITH_LIBDE265=ON \
+            -DWITH_X265=OFF \
+            -DWITH_AOM_ENCODER=OFF \
+            -DWITH_AOM_DECODER=OFF \
+            -DWITH_LIBSHARPYUV=OFF \
+            -DWITH_GDK_PIXBUF=OFF
+          cmake --build /tmp/libheif/build --parallel $(sysctl -n hw.ncpu)
+          sudo cmake --install /tmp/libheif/build
+          # Pin pkg-config to what we just installed: /usr/local is searched
+          # after /opt/homebrew, so a stray brew libheif would shadow it. And
+          # the libheif-sys build script refuses a non-host target unless
+          # ALLOW_CROSS is set, which the x86_64 half of a universal build is.
+          # ALL_STATIC makes pkg-config emit Libs.private, where libheif records
+          # the libde265 and -lc++ it needs once it is linked in statically.
+          # A narrower per-package lever (LIBHEIF_STATIC=1) also exists — Linux
+          # uses that instead because ALL_STATIC breaks its link (see the
+          # comment in the Linux step above): it reaches libdbus-sys too and
+          # demands a static dbus-1/libsystemd that apt doesn't provide.
+          # ALL_STATIC works fine here on macOS, so it stays the simpler choice.
+          echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_ALL_STATIC=1" >> "$GITHUB_ENV"
 
       - name: Install Windows dependencies (libheif via vcpkg)
         if: matrix.platform == 'windows-x64'
@@ -88,9 +249,95 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'ScanSplit ${{ github.ref_name }}'
           releaseDraft: true
-          prerelease: false
+          # Any hyphenated tag (v0.1.1-rc.1, v0.2.0-beta.1) is a prerelease.
+          # This matters because GitHub excludes prereleases from
+          # releases/latest, which is exactly what the download page's
+          # stable-name URLs resolve through — so a published rc could
+          # otherwise be served to everyone who clicks Download. The
+          # check-version job already strips this same -suffix when comparing
+          # the tag to the app version, so rc tags are a first-class flow here.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}
+          includeUpdaterJson: true
+
+      - name: Upload stable-named copy (macOS)
+        if: matrix.platform == 'macos-universal'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no universal .dmg found in bundle/dmg" >&2
+            exit 1
+          fi
+          if [ ${#files[@]} -gt 1 ]; then
+            echo "::warning::expected one .dmg, found ${#files[@]}: ${files[*]} — using the first"
+          fi
+          cp "${files[0]}" "/tmp/ScanSplit-macos-universal.dmg"
+          gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-macos-universal.dmg" --clobber
+
+      - name: Upload stable-named copy (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(src-tauri/target/release/bundle/nsis/*-setup.exe)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no nsis *-setup.exe found in bundle/nsis" >&2
+            exit 1
+          fi
+          if [ ${#files[@]} -gt 1 ]; then
+            echo "::warning::expected one *-setup.exe, found ${#files[@]}: ${files[*]} — using the first"
+          fi
+          cp "${files[0]}" "/tmp/ScanSplit-windows-x64-setup.exe"
+          gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-windows-x64-setup.exe" --clobber
+
+      - name: Upload stable-named copy (Linux)
+        if: matrix.platform == 'linux-x64'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no .AppImage found in bundle/appimage" >&2
+            exit 1
+          fi
+          if [ ${#files[@]} -gt 1 ]; then
+            echo "::warning::expected one .AppImage, found ${#files[@]}: ${files[*]} — using the first"
+          fi
+          cp "${files[0]}" "/tmp/ScanSplit-linux-x86_64.AppImage"
+          gh release upload "${{ github.ref_name }}" "/tmp/ScanSplit-linux-x86_64.AppImage" --clobber
+
+  verify-updater-json:
+    needs: build-tauri
+    runs-on: ubuntu-latest
+    steps:
+      - name: latest.json must carry every platform
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The three matrix jobs each read-modify-write this same asset with no
+          # locking, so a lost update would silently disable the updater for one
+          # platform. Fail the release rather than publish that.
+          gh release download "${{ github.ref_name }}" -R "${{ github.repository }}" -p latest.json -D . || {
+            echo "::error::latest.json missing from the release — updater would never fire" >&2
+            exit 1
+          }
+          for key in darwin-aarch64 darwin-x86_64 windows-x86_64 linux-x86_64; do
+            if ! node -p "Object.keys(require('./latest.json').platforms).includes('$key')" | grep -q true; then
+              echo "::error::latest.json is missing platform key $key — likely a lost update between concurrent matrix jobs" >&2
+              node -p "JSON.stringify(Object.keys(require('./latest.json').platforms))" >&2
+              exit 1
+            fi
+          done
+          echo "latest.json carries all four platform keys"

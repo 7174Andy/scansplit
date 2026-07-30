@@ -22,6 +22,7 @@ interface TauriApi {
     corrections: Array<[string, string]>
   ) => Promise<void>;
   getReceiptImage: (receiptId: string) => Promise<ReceiptImagePayload>;
+  isAppimage: () => Promise<boolean>;
 }
 
 const realApi: TauriApi = {
@@ -41,6 +42,7 @@ const realApi: TauriApi = {
     invoke<void>("record_code_corrections", { merchant, corrections }),
   getReceiptImage: (receiptId) =>
     invoke<ReceiptImagePayload>("get_receipt_image", { receiptId }),
+  isAppimage: () => invoke<boolean>("is_appimage"),
 };
 
 let lastSaved: FullTransaction | null = null;
@@ -96,6 +98,7 @@ const stubApi: TauriApi = {
       "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAr/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/wD//2Q==",
     byteSize: 286,
   }),
+  isAppimage: async () => false,
 };
 
 export const api: TauriApi = import.meta.env.MODE === "test" ? stubApi : realApi;

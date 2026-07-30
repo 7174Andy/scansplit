@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ScanSplit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.scansplit.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -20,6 +20,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -34,5 +35,12 @@
     "shortDescription": "Split receipts fairly. Locally.",
     "longDescription": "ScanSplit turns receipt photos into a fair per-person cost split. Line items are read by the Anthropic API; everything else stays on your machine. No accounts, no server."
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM0NEQ4MDgyMDM2QTY4MzIKUldReWFHb0Rnb0JOeElGbi9NbS8xeVRPQk90eDVhRkt6NFUzRmR6TDRoSndnSXZSVHJtYVdiY24K",
+      "endpoints": [
+        "https://github.com/7174Andy/scansplit/releases/latest/download/latest.json"
+      ]
+    }
+  }
 }
