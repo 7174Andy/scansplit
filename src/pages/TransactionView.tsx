@@ -11,6 +11,8 @@ import { formatDate } from "@/lib/formatDate";
 import { useWizardStore } from "@/store/wizardStore";
 import { Button } from "@/components/ui/button";
 import type { FullTransaction } from "@/lib/types";
+import { toSharePayload } from "../lib/shareFromTransaction";
+import { buildShareUrl } from "../lib/shareUrl";
 
 export default function TransactionView() {
   const { id = "" } = useParams<{ id: string }>();
@@ -70,6 +72,21 @@ export default function TransactionView() {
 
   async function copy() {
     if (!full || !split) return;
+    const shareUrl = buildShareUrl(
+      toSharePayload({
+        title: full.transaction.title,
+        currency: full.transaction.currency,
+        date: full.transaction.date,
+        people: full.people.map((p) => ({ id: p.id, name: p.name })),
+        items: full.items.map((i) => ({
+          id: i.id,
+          name: i.name,
+          priceCents: i.priceCents,
+          kind: i.kind,
+          assignedPersonIds: i.assignedPersonIds,
+        })),
+      })
+    );
     const lines = [
       full.transaction.title,
       ...split.perPerson.map((p) => {
@@ -79,6 +96,8 @@ export default function TransactionView() {
         return `${name}: ${formatCents(p.totalCents, full.transaction.currency)} (${detail})`;
       }),
       `Total: ${formatCents(split.totalCents, full.transaction.currency)}`,
+      "",
+      `Itemised breakdown: ${shareUrl}`,
     ];
     try {
       await writeText(lines.join("\n"));
