@@ -120,3 +120,19 @@ describe("TransactionView date display", () => {
     expect(screen.getByText(/15/)).toBeTruthy();
   });
 });
+
+describe("TransactionView share caveat", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  // This Copy button predates share links, so its behaviour changed under
+  // existing users. The caveat has to be visible where the choice is made.
+  it("warns next to Copy that the link is public and unrevocable", async () => {
+    vi.spyOn(api, "getTransaction").mockResolvedValue(sampleFull());
+    renderView();
+    const warning = await screen.findByText(/anyone can open/i);
+    expect(warning.textContent).toMatch(/can'?t be revoked/i);
+  });
+});

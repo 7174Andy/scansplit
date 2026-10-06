@@ -3,7 +3,7 @@ export type { SplitResult } from "./types";
 
 // Split exactly; leftover cents go to whichever sharer is currently furthest
 // from balance in the direction the cent corrects (lowest for charges, highest
-// for discounts). Ties broken by id order for determinism.
+// for discounts). Ties broken POSITIONALLY — see the note in `allocate`.
 interface AllocEntry {
   share: number;
   bumped: number;
@@ -29,6 +29,14 @@ function allocate(
   }
   const isCharge = sign > 0;
   for (let i = 0; i < remainder; i++) {
+    // TIE-BREAK IS POSITIONAL ON PURPOSE. `pickId` starts at sharerIds[0] and
+    // is only replaced on a STRICTLY better comparison below, so an exact tie
+    // leaves the earliest-listed sharer holding the cent. Do not add an
+    // `id < pickId` tie-break: the share page (src/share/reconstruct.ts)
+    // rebuilds people as `p0..pN` from their array index, while the desktop app
+    // passes real UUIDs whose order is random relative to display order. Any
+    // ID-derived ordering makes the two sides hand the leftover cent to
+    // different people — and one clipboard paste carries both sets of numbers.
     let pickId = sharerIds[0];
     let pickTotal = working.get(pickId)!;
     for (let j = 1; j < sharerIds.length; j++) {
@@ -37,8 +45,6 @@ function allocate(
       if (isCharge ? t < pickTotal : t > pickTotal) {
         pickId = id;
         pickTotal = t;
-      } else if (t === pickTotal && id < pickId) {
-        pickId = id;
       }
     }
     const cur = out.get(pickId)!;
@@ -51,7 +57,8 @@ function allocate(
 /**
  * Allocate `amountCents` proportionally to each person's `weight`.
  * Largest-remainder rounding: floor everyone, distribute the leftover cents
- * to the people with the largest fractional remainders (ties broken by id order).
+ * to the people with the largest fractional remainders (ties broken
+ * positionally — see the note on the comparator).
  */
 function allocateProportional(
   amountCents: number,
@@ -78,7 +85,13 @@ function allocateProportional(
     const fa = exact.get(a)! - floor.get(a)!;
     const fb = exact.get(b)! - floor.get(b)!;
     if (fa !== fb) return fb - fa;
-    return a < b ? -1 : a > b ? 1 : 0;
+    // TIE-BREAK IS POSITIONAL ON PURPOSE. Array.prototype.sort is stable
+    // (ES2019+) and `weights` is a Map built in `people` order, so returning 0
+    // keeps equal-remainder people in display order. Do not compare the ids:
+    // the share page rebuilds people as `p0..pN` from their array index while
+    // the desktop app passes real UUIDs, so an ID-derived tie-break would give
+    // the leftover cent to different people on the two sides.
+    return 0;
   });
   const bumpedSet = new Set<string>();
   for (let i = 0; i < remainder; i++) {
