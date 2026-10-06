@@ -8,7 +8,6 @@ import { DatePicker } from "@/components/DatePicker";
 import { useWizardStore } from "../../store/wizardStore";
 import { computeSplit } from "../../lib/splitMath";
 import { SplitTotalsTable } from "../../components/SplitTotalsTable";
-import { formatCents } from "../../lib/formatCurrency";
 import { api } from "../../lib/tauri";
 import { toSharePayload } from "../../lib/shareFromTransaction";
 import { buildShareUrl } from "../../lib/shareUrl";
@@ -54,20 +53,8 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
         })),
       })
     );
-    const lines = [
-      transaction.title,
-      ...split.perPerson.map((p) => {
-        const name = personNames[p.personId] ?? "?";
-        const detail = p.itemBreakdown
-          .map((b) => itemNames[b.itemId] ?? b.itemId).join(", ");
-        return `${name}: ${formatCents(p.totalCents, transaction.currency)} (${detail})`;
-      }),
-      `Total: ${formatCents(split.totalCents, transaction.currency)}`,
-      "",
-      `Itemised breakdown: ${shareUrl}`,
-    ];
     try {
-      await writeText(lines.join("\n"));
+      await writeText(shareUrl);
     } catch {
       // ignore clipboard failures (e.g., in non-Tauri test mode)
     }
@@ -144,7 +131,7 @@ export function Step5Result({ onBack }: { onBack: () => void }) {
           produces a public URL carrying every participant's name and amount.
           That decision gets made here, at the button — not in the README. */}
       <p className="mt-2 text-sm text-muted-foreground">
-        Copy includes a link anyone can open — it can&apos;t be revoked.
+        Copies a link anyone can open — it can&apos;t be revoked.
       </p>
       {err && <p className="mt-2 text-destructive">{err}</p>}
     </div>

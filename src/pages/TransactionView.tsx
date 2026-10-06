@@ -6,7 +6,6 @@ import { api } from "@/lib/tauri";
 import { computeSplit } from "@/lib/splitMath";
 import { SplitTotalsTable } from "@/components/SplitTotalsTable";
 import { ReceiptViewerDialog } from "@/components/ReceiptViewerDialog";
-import { formatCents } from "@/lib/formatCurrency";
 import { formatDate } from "@/lib/formatDate";
 import { useWizardStore } from "@/store/wizardStore";
 import { Button } from "@/components/ui/button";
@@ -87,20 +86,8 @@ export default function TransactionView() {
         })),
       })
     );
-    const lines = [
-      full.transaction.title,
-      ...split.perPerson.map((p) => {
-        const name = personNames[p.personId] ?? "?";
-        const detail = p.itemBreakdown
-          .map((b) => itemNames[b.itemId] ?? b.itemId).join(", ");
-        return `${name}: ${formatCents(p.totalCents, full.transaction.currency)} (${detail})`;
-      }),
-      `Total: ${formatCents(split.totalCents, full.transaction.currency)}`,
-      "",
-      `Itemised breakdown: ${shareUrl}`,
-    ];
     try {
-      await writeText(lines.join("\n"));
+      await writeText(shareUrl);
     } catch {
       // ignore in test mode
     }
@@ -151,7 +138,7 @@ export default function TransactionView() {
       {/* See the matching note in Step5Result: the caveat belongs next to the
           button that creates the link, where the user is deciding. */}
       <p className="mb-3 text-sm text-muted-foreground">
-        Copy includes a link anyone can open — it can&apos;t be revoked.
+        Copies a link anyone can open — it can&apos;t be revoked.
       </p>
       {err && <p className="mb-2 text-destructive">{err}</p>}
       {payerName && (

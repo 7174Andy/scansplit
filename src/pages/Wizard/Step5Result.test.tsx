@@ -1,8 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { MemoryRouter } from "react-router-dom";
 import { Step5Result } from "./Step5Result";
 import { useWizardStore } from "@/store/wizardStore";
+import { SHARE_BASE_URL } from "@/lib/shareUrl";
+
+vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeText: vi.fn() }));
 
 describe("Step5Result date picker", () => {
   beforeEach(() => {
@@ -57,5 +61,26 @@ describe("Step5Result share caveat", () => {
     const warning = screen.getByText(/anyone can open/i);
     expect(warning).toBeTruthy();
     expect(warning.textContent).toMatch(/can'?t be revoked/i);
+  });
+});
+
+describe("Step5Result copy", () => {
+  beforeEach(() => {
+    useWizardStore.getState().reset();
+  });
+  afterEach(() => cleanup());
+
+  // The payer pastes this into a group chat; the link alone carries the split.
+  it("copies only the share URL", async () => {
+    render(
+      <MemoryRouter>
+        <Step5Result onBack={() => {}} />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Copy/ }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const text = vi.mocked(writeText).mock.calls[0][0];
+    expect(text.startsWith(`${SHARE_BASE_URL}#`)).toBe(true);
+    expect(text).not.toMatch(/\s/);
   });
 });
